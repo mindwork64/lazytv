@@ -10,3 +10,4 @@ override_dh_auto_configure:
 
 override_dh_auto_test:
 	# Тестов нет
+
