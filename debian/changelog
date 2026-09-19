@@ -1,6 +1,5 @@
-lgremote (1.1.0-2) noble; urgency=medium
+lgremote (1.1.0+repack1-1) noble; urgency=medium
 
-  * Fix: include lgremote.desktop in source archive.
-  * Track lgremote.desktop in git repository.
+  * Repack: include lgremote.desktop in the source archive.
 
- -- mindwork64 <vmurashov85@gmail.com>  Sun, 20 Sep 2026 14:00:00 +0300
+ -- mindwork64 <vmurashov85@gmail.com>  Sun, 20 Sep 2026 14:30:00 +0300
