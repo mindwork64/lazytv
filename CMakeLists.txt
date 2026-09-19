@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.21)
-project(lgremote VERSION 1.0.0 LANGUAGES CXX)
+project(lgremote VERSION 1.1.0 LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -23,7 +23,6 @@ add_library(lgremote-core STATIC
 )
 add_library(LgRemote::Core ALIAS lgremote-core)
 
-# Имя для экспорта через find_package() — LgRemote::Core
 set_target_properties(lgremote-core PROPERTIES EXPORT_NAME Core)
 
 target_include_directories(lgremote-core
@@ -50,7 +49,6 @@ add_library(lgremote STATIC
 )
 add_library(LgRemote::Client ALIAS lgremote)
 
-# Имя для экспорта через find_package() — LgRemote::Client
 set_target_properties(lgremote PROPERTIES EXPORT_NAME Client)
 
 target_link_libraries(lgremote
@@ -83,11 +81,11 @@ target_link_libraries(lgremote-app PRIVATE
     Qt6::Svg
 )
 
-# Имя выходного файла — lgremote (без -app), как и раньше
+# Имя выходного файла — lgremote (без -app)
 set_target_properties(lgremote-app PROPERTIES OUTPUT_NAME lgremote)
 
 # =====================================================================
-# Установка библиотеки
+# Установка библиотек
 # =====================================================================
 include(CMakePackageConfigHelpers)
 
@@ -125,4 +123,20 @@ install(FILES
     ${CMAKE_CURRENT_BINARY_DIR}/LgRemoteConfig.cmake
     ${CMAKE_CURRENT_BINARY_DIR}/LgRemoteConfigVersion.cmake
     DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/LgRemote
+)
+
+# =====================================================================
+# Установка приложения (для PPA / системной установки)
+# =====================================================================
+install(TARGETS lgremote-app
+    RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
+)
+
+install(FILES lgremote.desktop
+    DESTINATION ${CMAKE_INSTALL_DATAROOTDIR}/applications
+)
+
+install(FILES resources/ic_launcher.svg
+    DESTINATION ${CMAKE_INSTALL_DATAROOTDIR}/icons/hicolor/scalable/apps
+    RENAME lgremote.svg
 )

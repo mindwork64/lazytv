@@ -1,0 +1,8 @@
+lgremote (1.1.0-1) noble; urgency=medium
+
+  * Initial release in PPA.
+  * Reusable library API (LgRemote::Core, LgRemote::Client).
+  * Public headers in include/lgremote/.
+  * CMake install rules with find_package support.
+
+ -- mindwork64 <vmurashov85@gmail.com>  Sun, 20 Sep 2026 12:00:00 +0300
