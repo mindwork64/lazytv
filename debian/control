@@ -7,8 +7,8 @@ Build-Depends:
  cmake (>= 3.21),
  qt6-base-dev,
  qt6-svg-dev,
- libgl1-mesa-dev,
- pkg-config
+ libgl-dev,
+ pkgconf
 Standards-Version: 4.6.2
 Homepage: https://github.com/mindwork64/lgremote-qt
 Vcs-Git: https://github.com/mindwork64/lgremote-qt.git
