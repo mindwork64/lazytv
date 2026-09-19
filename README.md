@@ -7,6 +7,7 @@
 2010–2014 годов, а также часть более новых с включённым режимом совместимости).
 Работает по локальной сети, без облаков, без регистрации, без сбора данных.
 
+![Скриншот главного экрана](docs/screenshot-main.png)
 
 ---
 
@@ -43,6 +44,7 @@
 Всё. Дальше приложение запомнит сессию, и при следующем запуске сразу откроет
 пульт — вводить код заново не нужно.
 
+![Экран сопряжения](docs/screenshot-pairing.png)
 
 ---
 
@@ -65,6 +67,7 @@
 PIN-кодов в родительском контроле, поиска в YouTube, ввода паролей от
 приложений Smart TV.
 
+![Цифровая клавиатура](docs/screenshot-keypad.png)
 
 ### Настройки
 
@@ -73,6 +76,7 @@ PIN-кодов в родительском контроле, поиска в You
 - **Три темы оформления**: тёмная, светлая, системная
 - Информация о версии
 
+![Настройки](docs/screenshot-settings.png)
 
 ### Индикатор состояния
 
@@ -250,9 +254,9 @@ rm -rf ~/.config/lgremote
 └───────────────────────┬──────────────────────────┘
                         │ сигналы/слоты
 ┌───────────────────────▼──────────────────────────┐
-│  AppContainer                                    │
+│  lgremote::AppContainer                          │
 │  ├── SessionStore (JSON в ~/.config/lgremote/)   │
-│  └── LgNetCastClient (QNetworkAccessManager)     │
+│  └── Client (QNetworkAccessManager)              │
 └───────────────────────┬──────────────────────────┘
                         │ HTTP POST
                         ▼
@@ -260,6 +264,85 @@ rm -rf ~/.config/lgremote
 ```
 
 Исходный код доступен на GitHub: **mindwork64/lgremote-qt**.
+
+---
+
+## Использование как библиотеки
+
+Ядро проекта — реализация протокола LG NetCast — можно использовать
+в собственных C++/Qt6 приложениях. Библиотека не тянет за собой UI,
+зависит только от `Qt6::Core` и `Qt6::Network`.
+
+### Установка
+
+```bash
+git clone https://github.com/mindwork64/lgremote-qt.git
+cd lgremote-qt
+cmake -B build -S . -DCMAKE_BUILD_TYPE=Release
+cmake --build build -j
+sudo cmake --install build --prefix /usr/local
+```
+
+После установки доступны два уровня API:
+
+| CMake-цель | Что внутри |
+|---|---|
+| `LgRemote::Core` | Только протокол: класс `lgremote::Client` для сопряжения и команд |
+| `LgRemote::Client` | То же + `lgremote::SessionStore` (JSON-конфиг) и `lgremote::AppContainer` |
+
+### Пример использования
+
+```cpp
+#include <QCoreApplication>
+#include <QDebug>
+#include <lgremote/client.hpp>
+
+int main(int argc, char** argv) {
+    QCoreApplication app(argc, argv);
+
+    lgremote::Client client("192.168.1.42");
+
+    QObject::connect(&client, &lgremote::Client::pairingKeyResult,
+        [](bool ok) { qInfo() << "Key request:" << ok; });
+
+    QObject::connect(&client, &lgremote::Client::pairingConfirmResult,
+        [&](const QString& session) {
+            if (session.isEmpty()) {
+                qWarning() << "Pairing rejected";
+                app.exit(1);
+                return;
+            }
+            client.setSession(session);
+            client.sendCommand(lgremote::Client::Command::Power);
+        });
+
+    QObject::connect(&client, &lgremote::Client::commandResult,
+        [&](bool ok) { app.exit(ok ? 0 : 2); });
+
+    client.requestPairingKey();
+    return app.exec();
+}
+```
+
+`CMakeLists.txt` потребителя:
+
+```cmake
+cmake_minimum_required(VERSION 3.21)
+project(my_remote LANGUAGES CXX)
+
+set(CMAKE_CXX_STANDARD 20)
+set(CMAKE_AUTOMOC ON)
+
+find_package(Qt6 REQUIRED COMPONENTS Core)
+find_package(LgRemote REQUIRED)
+
+qt_add_executable(my_remote main.cpp)
+target_link_libraries(my_remote PRIVATE LgRemote::Core)
+```
+
+Полный пример — в [`examples/minimal_client/`](examples/minimal_client/).
+Он собирается отдельно против установленной библиотеки и не требует
+всего дерева исходников.
 
 ---
 
