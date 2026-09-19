@@ -4,3 +4,4 @@ AppDir/
 !linuxdeploy*.AppImage
 lgremote.desktop
 lgremote.svg
+.vscode
