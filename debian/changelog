@@ -1,5 +1,7 @@
-lgremote (1.1.0+repack1-1) noble; urgency=medium
+lgremote (1.1.0+repack2-1) noble; urgency=medium
 
-  * Repack: include lgremote.desktop in the source archive.
+  * Repack: add LGREMOTE_INSTALL_LIB option.
+  * PPA build: install only the executable and desktop files.
+  * Drop debian/lgremote.install (no longer needed).
 
- -- mindwork64 <vmurashov85@gmail.com>  Sun, 20 Sep 2026 14:30:00 +0300
+ -- mindwork64 <vmurashov85@gmail.com>  Sun, 20 Sep 2026 14:50:00 +0300

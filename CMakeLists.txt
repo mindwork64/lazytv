@@ -9,6 +9,12 @@ set(CMAKE_INCLUDE_CURRENT_DIR ON)
 
 include(GNUInstallDirs)
 
+# Опция: устанавливать библиотечные файлы (заголовки, .a, CMake config).
+# Для PPA-пакета выключается, чтобы в .deb попал только исполняемый файл.
+option(LGREMOTE_INSTALL_LIB
+    "Install library files (headers, static libs, CMake configs)"
+    ON)
+
 find_package(Qt6 REQUIRED COMPONENTS Core Gui Widgets Network Svg)
 
 qt_standard_project_setup()
@@ -81,52 +87,53 @@ target_link_libraries(lgremote-app PRIVATE
     Qt6::Svg
 )
 
-# Имя выходного файла — lgremote (без -app)
 set_target_properties(lgremote-app PROPERTIES OUTPUT_NAME lgremote)
 
 # =====================================================================
-# Установка библиотек
+# Установка библиотеки (опционально)
 # =====================================================================
-include(CMakePackageConfigHelpers)
+if(LGREMOTE_INSTALL_LIB)
+    include(CMakePackageConfigHelpers)
 
-install(TARGETS lgremote-core lgremote
-    EXPORT LgRemoteTargets
-    ARCHIVE  DESTINATION ${CMAKE_INSTALL_LIBDIR}
-    LIBRARY  DESTINATION ${CMAKE_INSTALL_LIBDIR}
-    RUNTIME  DESTINATION ${CMAKE_INSTALL_BINDIR}
-    INCLUDES DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
-)
+    install(TARGETS lgremote-core lgremote
+        EXPORT LgRemoteTargets
+        ARCHIVE  DESTINATION ${CMAKE_INSTALL_LIBDIR}
+        LIBRARY  DESTINATION ${CMAKE_INSTALL_LIBDIR}
+        RUNTIME  DESTINATION ${CMAKE_INSTALL_BINDIR}
+        INCLUDES DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
+    )
 
-install(DIRECTORY include/lgremote
-    DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
-)
+    install(DIRECTORY include/lgremote
+        DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
+    )
 
-install(EXPORT LgRemoteTargets
-    FILE LgRemoteTargets.cmake
-    NAMESPACE LgRemote::
-    DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/LgRemote
-)
+    install(EXPORT LgRemoteTargets
+        FILE LgRemoteTargets.cmake
+        NAMESPACE LgRemote::
+        DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/LgRemote
+    )
 
-configure_package_config_file(
-    cmake/LgRemoteConfig.cmake.in
-    ${CMAKE_CURRENT_BINARY_DIR}/LgRemoteConfig.cmake
-    INSTALL_DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/LgRemote
-)
+    configure_package_config_file(
+        cmake/LgRemoteConfig.cmake.in
+        ${CMAKE_CURRENT_BINARY_DIR}/LgRemoteConfig.cmake
+        INSTALL_DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/LgRemote
+    )
 
-write_basic_package_version_file(
-    ${CMAKE_CURRENT_BINARY_DIR}/LgRemoteConfigVersion.cmake
-    VERSION ${PROJECT_VERSION}
-    COMPATIBILITY SameMajorVersion
-)
+    write_basic_package_version_file(
+        ${CMAKE_CURRENT_BINARY_DIR}/LgRemoteConfigVersion.cmake
+        VERSION ${PROJECT_VERSION}
+        COMPATIBILITY SameMajorVersion
+    )
 
-install(FILES
-    ${CMAKE_CURRENT_BINARY_DIR}/LgRemoteConfig.cmake
-    ${CMAKE_CURRENT_BINARY_DIR}/LgRemoteConfigVersion.cmake
-    DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/LgRemote
-)
+    install(FILES
+        ${CMAKE_CURRENT_BINARY_DIR}/LgRemoteConfig.cmake
+        ${CMAKE_CURRENT_BINARY_DIR}/LgRemoteConfigVersion.cmake
+        DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/LgRemote
+    )
+endif()
 
 # =====================================================================
-# Установка приложения (для PPA / системной установки)
+# Установка приложения (всегда)
 # =====================================================================
 install(TARGETS lgremote-app
     RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
