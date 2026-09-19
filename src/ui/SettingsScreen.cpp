@@ -1,21 +1,25 @@
 #include "ui/SettingsScreen.hpp"
-#include "data/AppContainer.hpp"
-#include "theme/Theme.hpp"
 
+#include <QFrame>
 #include <QHBoxLayout>
 #include <QLabel>
 #include <QPushButton>
 #include <QRadioButton>
 #include <QVBoxLayout>
 
-SettingsScreen::SettingsScreen(AppContainer *container, QWidget *parent)
+#include <lgremote/app_container.hpp>
+
+#include "theme/Theme.hpp"
+
+SettingsScreen::SettingsScreen(lgremote::AppContainer *container,
+                               QWidget *parent)
     : QWidget(parent), m_container(container) {
 
   auto *root = new QVBoxLayout(this);
   root->setContentsMargins(16, 16, 16, 16);
   root->setSpacing(16);
 
-  // Заголовок с кнопкой "Назад"
+  // Заголовок
   auto *header = new QHBoxLayout;
   auto *backBtn = new QPushButton("← Назад", this);
   connect(backBtn, &QPushButton::clicked, this, &SettingsScreen::back);
@@ -30,8 +34,7 @@ SettingsScreen::SettingsScreen(AppContainer *container, QWidget *parent)
   root->addLayout(header);
 
   // Телевизор
-  auto *tvLabel = new QLabel("Телевизор", this);
-  root->addWidget(tvLabel);
+  root->addWidget(new QLabel("Телевизор", this));
 
   m_ipLabel = new QLabel(this);
   root->addWidget(m_ipLabel);

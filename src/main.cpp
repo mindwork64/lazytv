@@ -1,8 +1,7 @@
 #include <QApplication>
-#include <QDir>
-#include <QIcon>
 
-#include "data/AppContainer.hpp"
+#include <lgremote/app_container.hpp>
+
 #include "theme/Theme.hpp"
 #include "ui/MainWindow.hpp"
 
@@ -12,7 +11,7 @@ int main(int argc, char **argv) {
   app.setApplicationDisplayName("LG Лентяйка");
   app.setOrganizationName("mindwork64");
 
-  AppContainer container;
+  lgremote::AppContainer container;
 
   ThemeManager::instance().apply(container.store().themeMode());
 

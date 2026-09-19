@@ -9,13 +9,16 @@
 #include <QTimer>
 #include <QVBoxLayout>
 
-#include "data/AppContainer.hpp"
-#include "net/LgNetCastClient.hpp"
+#include <lgremote/app_container.hpp>
+#include <lgremote/client.hpp>
+
 #include "theme/Theme.hpp"
 #include "ui/widgets/DPad.hpp"
 #include "ui/widgets/IconButton.hpp"
 #include "ui/widgets/Keypad.hpp"
 #include "ui/widgets/RockerColumn.hpp"
+
+using Cmd = lgremote::Client::Command;
 
 namespace {
 
@@ -42,7 +45,7 @@ QWidget *wrapRow(std::initializer_list<QWidget *> widgets, int spacing = 12) {
 
 } // namespace
 
-RemoteScreen::RemoteScreen(AppContainer *container, QWidget *parent)
+RemoteScreen::RemoteScreen(lgremote::AppContainer *container, QWidget *parent)
     : QWidget(parent), m_container(container) {
 
   auto *root = new QVBoxLayout(this);
@@ -90,7 +93,7 @@ QWidget *RemoteScreen::buildMainPage() {
   power->setLabelVisible(false);
   power->setFixedSize(56, 56);
   connect(power, &QAbstractButton::clicked, this,
-          [this] { sendCommand(LgNetCastClient::POWER); });
+          [this] { sendCommand(Cmd::Power); });
 
   auto *powerWrap = new QWidget;
   auto *powerLayout = new QHBoxLayout(powerWrap);
@@ -101,29 +104,29 @@ QWidget *RemoteScreen::buildMainPage() {
   // Рокер громкости
   auto *vol = new RockerColumn("VOL", page);
   connect(vol, &RockerColumn::plus, this,
-          [this] { sendCommand(LgNetCastClient::VOLUME_UP); });
+          [this] { sendCommand(Cmd::VolumeUp); });
   connect(vol, &RockerColumn::minus, this,
-          [this] { sendCommand(LgNetCastClient::VOLUME_DOWN); });
+          [this] { sendCommand(Cmd::VolumeDown); });
 
   // Home / Exit
   auto *home = new IconButton(":/icons/home.svg", "HOME", page);
   home->setMinimumHeight(72);
   connect(home, &QAbstractButton::clicked, this,
-          [this] { sendCommand(LgNetCastClient::HOME_MENU); });
+          [this] { sendCommand(Cmd::HomeMenu); });
 
   auto *exitBtn = new IconButton(":/icons/exit.svg", "EXIT", page);
   exitBtn->setMinimumHeight(72);
   connect(exitBtn, &QAbstractButton::clicked, this,
-          [this] { sendCommand(LgNetCastClient::EXIT); });
+          [this] { sendCommand(Cmd::Exit); });
 
   auto *homeExitColumn = wrapColumn({home, exitBtn}, 12);
 
   // Рокер каналов
   auto *ch = new RockerColumn("CH", page);
   connect(ch, &RockerColumn::plus, this,
-          [this] { sendCommand(LgNetCastClient::CHANNEL_UP); });
+          [this] { sendCommand(Cmd::ChannelUp); });
   connect(ch, &RockerColumn::minus, this,
-          [this] { sendCommand(LgNetCastClient::CHANNEL_DOWN); });
+          [this] { sendCommand(Cmd::ChannelDown); });
 
   auto *topRow = new QWidget;
   auto *topLayout = new QHBoxLayout(topRow);
@@ -135,7 +138,7 @@ QWidget *RemoteScreen::buildMainPage() {
 
   // Средний ряд
   auto makeBtn = [&](const QString &svg, const QString &lbl,
-                     int cmd) -> QWidget * {
+                     Cmd cmd) -> IconButton * {
     auto *b = new IconButton(svg, lbl, page);
     b->setMinimumHeight(72);
     connect(b, &QAbstractButton::clicked, this,
@@ -143,38 +146,28 @@ QWidget *RemoteScreen::buildMainPage() {
     return b;
   };
 
-  QWidget *mute =
-      makeBtn(":/icons/mute.svg", "MUTE", LgNetCastClient::MUTE_TOGGLE);
-  QWidget *back = makeBtn(":/icons/back.svg", "BACK", LgNetCastClient::BACK);
-  QWidget *kbd = makeBtn(":/icons/kbd.svg", "KBD", 0);
-  QWidget *input =
-      makeBtn(":/icons/input.svg", "INPUT", LgNetCastClient::EXTERNAL_INPUT);
+  IconButton *mute = makeBtn(":/icons/mute.svg", "MUTE", Cmd::MuteToggle);
+  IconButton *back = makeBtn(":/icons/back.svg", "BACK", Cmd::Back);
 
-  connect(kbd, &QWidget::customContextMenuRequested, this,
-          [] {}); // no-op (заглушка)
-  // Просто навешиваем клик через отдельный connect на сам IconButton — но kbd
-  // уже указан как QWidget*, поэтому добавим переключение страницы иначе:
-  // (сделаем это через dynamic_cast на QAbstractButton)
-  if (auto *kbdBtn = qobject_cast<QAbstractButton *>(kbd)) {
-    connect(kbdBtn, &QAbstractButton::clicked, this,
-            [this] { m_pages->setCurrentIndex(1); });
-  }
+  IconButton *kbd = new IconButton(":/icons/kbd.svg", "KBD", page);
+  kbd->setMinimumHeight(72);
+  connect(kbd, &QAbstractButton::clicked, this,
+          [this] { m_pages->setCurrentIndex(1); });
+
+  IconButton *input = makeBtn(":/icons/input.svg", "INPUT", Cmd::ExternalInput);
 
   auto *midRow = wrapRow({mute, back, kbd, input}, 10);
 
   // D-Pad
   auto *dpad = new DPad(page);
-  connect(dpad, &DPad::up, this, [this] { sendCommand(LgNetCastClient::UP); });
-  connect(dpad, &DPad::down, this,
-          [this] { sendCommand(LgNetCastClient::DOWN); });
-  connect(dpad, &DPad::left, this,
-          [this] { sendCommand(LgNetCastClient::LEFT); });
-  connect(dpad, &DPad::right, this,
-          [this] { sendCommand(LgNetCastClient::RIGHT); });
-  connect(dpad, &DPad::ok, this, [this] { sendCommand(LgNetCastClient::OK); });
+  connect(dpad, &DPad::up, this, [this] { sendCommand(Cmd::Up); });
+  connect(dpad, &DPad::down, this, [this] { sendCommand(Cmd::Down); });
+  connect(dpad, &DPad::left, this, [this] { sendCommand(Cmd::Left); });
+  connect(dpad, &DPad::right, this, [this] { sendCommand(Cmd::Right); });
+  connect(dpad, &DPad::ok, this, [this] { sendCommand(Cmd::Ok); });
 
   // INFO
-  QWidget *info = makeBtn(":/icons/info.svg", "INFO", LgNetCastClient::INFO);
+  IconButton *info = makeBtn(":/icons/info.svg", "INFO", Cmd::Info);
   info->setFixedWidth(96);
 
   auto *infoWrap = new QWidget;
@@ -184,7 +177,6 @@ QWidget *RemoteScreen::buildMainPage() {
   infoLayout->addWidget(info);
   infoLayout->addStretch();
 
-  // Компоновка
   auto *layout = new QVBoxLayout(page);
   layout->setContentsMargins(0, 0, 0, 0);
   layout->setSpacing(14);
@@ -207,13 +199,13 @@ QWidget *RemoteScreen::buildNumbersPage() {
     const int digit = i + 1;
     auto *key = new KeypadKey(digit, page);
     connect(key, &QAbstractButton::clicked, this,
-            [this, digit] { sendCommand(LgNetCastClient::NUMBER_0 + digit); });
+            [this, digit] { sendCommand(lgremote::Client::digit(digit)); });
     grid->addWidget(key, i / 3, i % 3);
   }
 
   auto *zero = new KeypadKey(0, page);
   connect(zero, &QAbstractButton::clicked, this,
-          [this] { sendCommand(LgNetCastClient::NUMBER_0); });
+          [this] { sendCommand(lgremote::Client::digit(0)); });
   grid->addWidget(zero, 3, 1);
 
   auto *backKey = new KeypadKey(-1, page);
@@ -224,7 +216,7 @@ QWidget *RemoteScreen::buildNumbersPage() {
   return page;
 }
 
-void RemoteScreen::sendCommand(int cmd) {
+void RemoteScreen::sendCommand(Cmd cmd) {
   auto *client = m_container->getClient();
   if (!client) {
     m_lastAttemptFailed = true;
@@ -234,7 +226,7 @@ void RemoteScreen::sendCommand(int cmd) {
     recomputeStatus();
     return;
   }
-  connect(client, &LgNetCastClient::commandResult, this,
+  connect(client, &lgremote::Client::commandResult, this,
           &RemoteScreen::onCommandResult, Qt::UniqueConnection);
   client->sendCommand(cmd);
 }

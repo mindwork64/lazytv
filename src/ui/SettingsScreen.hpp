@@ -1,14 +1,19 @@
 #pragma once
+
 #include <QWidget>
 
+namespace lgremote {
 class AppContainer;
+}
+
 class QLabel;
 class QRadioButton;
 
 class SettingsScreen : public QWidget {
   Q_OBJECT
 public:
-  explicit SettingsScreen(AppContainer *container, QWidget *parent = nullptr);
+  explicit SettingsScreen(lgremote::AppContainer *container,
+                          QWidget *parent = nullptr);
 
   void refresh();
 
@@ -18,7 +23,7 @@ signals:
   void themeModeChanged(int);
 
 private:
-  AppContainer *m_container;
+  lgremote::AppContainer *m_container;
   QLabel *m_ipLabel = nullptr;
   QRadioButton *m_sys = nullptr;
   QRadioButton *m_dark = nullptr;

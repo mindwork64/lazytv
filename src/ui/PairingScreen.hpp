@@ -1,8 +1,12 @@
 #pragma once
+
 #include <QWidget>
 
+namespace lgremote {
 class AppContainer;
-class LgNetCastClient;
+class Client;
+} // namespace lgremote
+
 class QLineEdit;
 class QLabel;
 class QPushButton;
@@ -11,7 +15,8 @@ class QProgressBar;
 class PairingScreen : public QWidget {
   Q_OBJECT
 public:
-  explicit PairingScreen(AppContainer *container, QWidget *parent = nullptr);
+  explicit PairingScreen(lgremote::AppContainer *container,
+                         QWidget *parent = nullptr);
 
 signals:
   void connected();
@@ -23,7 +28,7 @@ private:
   void setInfo(const QString &);
   void setError(const QString &);
 
-  AppContainer *m_container;
+  lgremote::AppContainer *m_container;
   QLineEdit *m_ip;
   QLineEdit *m_key;
   QPushButton *m_reqBtn;
@@ -31,5 +36,5 @@ private:
   QProgressBar *m_progress;
   QLabel *m_infoLabel;
   QLabel *m_errorLabel;
-  LgNetCastClient *m_activeClient = nullptr;
+  lgremote::Client *m_activeClient = nullptr;
 };

@@ -1,7 +1,11 @@
 #pragma once
+
 #include <QMainWindow>
 
+namespace lgremote {
 class AppContainer;
+}
+
 class QStackedWidget;
 class PairingScreen;
 class RemoteScreen;
@@ -10,14 +14,14 @@ class SettingsScreen;
 class MainWindow : public QMainWindow {
   Q_OBJECT
 public:
-  explicit MainWindow(AppContainer *container);
+  explicit MainWindow(lgremote::AppContainer *container);
 
 private:
   enum Screen { Pairing = 0, Remote, Settings };
 
   void showScreen(Screen s);
 
-  AppContainer *m_container;
+  lgremote::AppContainer *m_container;
   QStackedWidget *m_stack;
   PairingScreen *m_pairing;
   RemoteScreen *m_remote;

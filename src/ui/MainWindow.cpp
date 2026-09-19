@@ -1,13 +1,15 @@
 #include "ui/MainWindow.hpp"
-#include "data/AppContainer.hpp"
+
+#include <QStackedWidget>
+
+#include <lgremote/app_container.hpp>
+
 #include "theme/Theme.hpp"
 #include "ui/PairingScreen.hpp"
 #include "ui/RemoteScreen.hpp"
 #include "ui/SettingsScreen.hpp"
 
-#include <QStackedWidget>
-
-MainWindow::MainWindow(AppContainer *container)
+MainWindow::MainWindow(lgremote::AppContainer *container)
     : QMainWindow(nullptr), m_container(container) {
 
   setWindowTitle("LG Лентяйка");

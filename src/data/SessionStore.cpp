@@ -1,10 +1,12 @@
-#include "data/SessionStore.hpp"
+#include <lgremote/session_store.hpp>
 
 #include <QDir>
 #include <QFile>
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QStandardPaths>
+
+namespace lgremote {
 
 SessionStore::SessionStore() {
   const QString base =
@@ -68,3 +70,5 @@ void SessionStore::clearAll() {
   m_themeMode = 1;
   save();
 }
+
+} // namespace lgremote

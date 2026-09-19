@@ -2,9 +2,14 @@
 
 #include <QWidget>
 
+#include <lgremote/client.hpp>
+
 #include "ui/widgets/StatusBar.hpp" // ConnectionStatus
 
+namespace lgremote {
 class AppContainer;
+}
+
 class QStackedWidget;
 class QLabel;
 class QTimer;
@@ -12,7 +17,8 @@ class QTimer;
 class RemoteScreen : public QWidget {
   Q_OBJECT
 public:
-  explicit RemoteScreen(AppContainer *container, QWidget *parent = nullptr);
+  explicit RemoteScreen(lgremote::AppContainer *container,
+                        QWidget *parent = nullptr);
 
 signals:
   void openSettings();
@@ -25,12 +31,12 @@ private:
   QWidget *buildMainPage();
   QWidget *buildNumbersPage();
 
-  void sendCommand(int cmd);
+  void sendCommand(lgremote::Client::Command cmd);
   void onCommandResult(bool ok);
   void recomputeStatus();
   void updateErrorBannerStyle();
 
-  AppContainer *m_container = nullptr;
+  lgremote::AppContainer *m_container = nullptr;
   StatusBar *m_statusBar = nullptr;
   QStackedWidget *m_pages = nullptr;
   QLabel *m_errorBanner = nullptr;

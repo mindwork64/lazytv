@@ -7,16 +7,62 @@ set(CMAKE_AUTOMOC ON)
 set(CMAKE_AUTORCC ON)
 set(CMAKE_INCLUDE_CURRENT_DIR ON)
 
+include(GNUInstallDirs)
+
 find_package(Qt6 REQUIRED COMPONENTS Core Gui Widgets Network Svg)
 
 qt_standard_project_setup()
 
-qt_add_executable(lgremote
-    src/main.cpp
-    src/theme/Theme.cpp
+# =====================================================================
+# liblgremote-core — протокол LG NetCast, без UI и без persistence
+# =====================================================================
+add_library(lgremote-core STATIC
+    src/net/LgNetCastClient.cpp
+    include/lgremote/client.hpp
+    include/lgremote/lgremote_export.h
+)
+add_library(LgRemote::Core ALIAS lgremote-core)
+
+# Имя для экспорта через find_package() — LgRemote::Core
+set_target_properties(lgremote-core PROPERTIES EXPORT_NAME Core)
+
+target_include_directories(lgremote-core
+    PUBLIC
+        $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+        $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>
+)
+
+target_link_libraries(lgremote-core
+    PUBLIC
+        Qt6::Core
+        Qt6::Network
+)
+
+# =====================================================================
+# liblgremote — core + SessionStore + AppContainer
+# =====================================================================
+add_library(lgremote STATIC
     src/data/SessionStore.cpp
     src/data/AppContainer.cpp
-    src/net/LgNetCastClient.cpp
+    include/lgremote/session_store.hpp
+    include/lgremote/app_container.hpp
+    include/lgremote/lgremote.h
+)
+add_library(LgRemote::Client ALIAS lgremote)
+
+# Имя для экспорта через find_package() — LgRemote::Client
+set_target_properties(lgremote PROPERTIES EXPORT_NAME Client)
+
+target_link_libraries(lgremote
+    PUBLIC lgremote-core
+)
+
+# =====================================================================
+# Приложение
+# =====================================================================
+qt_add_executable(lgremote-app
+    src/main.cpp
+    src/theme/Theme.cpp
     src/ui/MainWindow.cpp
     src/ui/RemoteScreen.cpp
     src/ui/PairingScreen.cpp
@@ -29,12 +75,54 @@ qt_add_executable(lgremote
     resources/resources.qrc
 )
 
-target_include_directories(lgremote PRIVATE src)
+target_include_directories(lgremote-app PRIVATE src)
 
-target_link_libraries(lgremote PRIVATE
-    Qt6::Core
-    Qt6::Gui
+target_link_libraries(lgremote-app PRIVATE
+    lgremote
     Qt6::Widgets
-    Qt6::Network
     Qt6::Svg
+)
+
+# Имя выходного файла — lgremote (без -app), как и раньше
+set_target_properties(lgremote-app PROPERTIES OUTPUT_NAME lgremote)
+
+# =====================================================================
+# Установка библиотеки
+# =====================================================================
+include(CMakePackageConfigHelpers)
+
+install(TARGETS lgremote-core lgremote
+    EXPORT LgRemoteTargets
+    ARCHIVE  DESTINATION ${CMAKE_INSTALL_LIBDIR}
+    LIBRARY  DESTINATION ${CMAKE_INSTALL_LIBDIR}
+    RUNTIME  DESTINATION ${CMAKE_INSTALL_BINDIR}
+    INCLUDES DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
+)
+
+install(DIRECTORY include/lgremote
+    DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
+)
+
+install(EXPORT LgRemoteTargets
+    FILE LgRemoteTargets.cmake
+    NAMESPACE LgRemote::
+    DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/LgRemote
+)
+
+configure_package_config_file(
+    cmake/LgRemoteConfig.cmake.in
+    ${CMAKE_CURRENT_BINARY_DIR}/LgRemoteConfig.cmake
+    INSTALL_DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/LgRemote
+)
+
+write_basic_package_version_file(
+    ${CMAKE_CURRENT_BINARY_DIR}/LgRemoteConfigVersion.cmake
+    VERSION ${PROJECT_VERSION}
+    COMPATIBILITY SameMajorVersion
+)
+
+install(FILES
+    ${CMAKE_CURRENT_BINARY_DIR}/LgRemoteConfig.cmake
+    ${CMAKE_CURRENT_BINARY_DIR}/LgRemoteConfigVersion.cmake
+    DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/LgRemote
 )

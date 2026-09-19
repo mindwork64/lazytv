@@ -1,4 +1,4 @@
-#include "net/LgNetCastClient.hpp"
+#include <lgremote/client.hpp>
 
 #include <QDateTime>
 #include <QNetworkAccessManager>
@@ -8,12 +8,22 @@
 #include <QUrl>
 #include <QXmlStreamReader>
 
-LgNetCastClient::LgNetCastClient(QString host, QObject *parent)
+namespace lgremote {
+
+Client::Client(QString host, QObject *parent)
     : QObject(parent), m_host(std::move(host)),
       m_nam(new QNetworkAccessManager(this)) {}
 
-void LgNetCastClient::post(const QString &url, const QByteArray &body,
-                           std::function<void(int, QByteArray)> cb) {
+Client::Command Client::digit(int d) {
+  if (d < 0)
+    d = 0;
+  if (d > 9)
+    d = 9;
+  return static_cast<Command>(static_cast<int>(Command::Number0) + d);
+}
+
+void Client::post(const QString &url, const QByteArray &body,
+                  std::function<void(int, QByteArray)> cb) {
   QNetworkRequest req{QUrl(url)};
   req.setHeader(QNetworkRequest::ContentTypeHeader, "application/atom+xml");
   req.setTransferTimeout(3000);
@@ -28,7 +38,7 @@ void LgNetCastClient::post(const QString &url, const QByteArray &body,
   });
 }
 
-void LgNetCastClient::requestPairingKey() {
+void Client::requestPairingKey() {
   const QString url =
       QStringLiteral("http://%1:%2/roap/api/auth").arg(m_host).arg(kPort);
   const QByteArray body = "<?xml version=\"1.0\" encoding=\"utf-8\"?>"
@@ -38,7 +48,7 @@ void LgNetCastClient::requestPairingKey() {
        [this](int code, QByteArray) { emit pairingKeyResult(code == 200); });
 }
 
-void LgNetCastClient::confirmPairing(const QString &key) {
+void Client::confirmPairing(const QString &key) {
   const QString url =
       QStringLiteral("http://%1:%2/roap/api/auth").arg(m_host).arg(kPort);
   const QByteArray body =
@@ -68,12 +78,12 @@ void LgNetCastClient::confirmPairing(const QString &key) {
   });
 }
 
-void LgNetCastClient::sendCommand(int cmd) {
+void Client::sendCommand(Command cmd) {
   m_queue.enqueue(cmd);
   tryProcessNext();
 }
 
-void LgNetCastClient::tryProcessNext() {
+void Client::tryProcessNext() {
   if (m_inFlight || m_queue.isEmpty())
     return;
 
@@ -81,7 +91,7 @@ void LgNetCastClient::tryProcessNext() {
   const qint64 elapsed = now - m_lastCommandAt;
   if (m_lastCommandAt > 0 && elapsed < kMinCommandIntervalMs) {
     QTimer::singleShot(static_cast<int>(kMinCommandIntervalMs - elapsed), this,
-                       &LgNetCastClient::tryProcessNext);
+                       &Client::tryProcessNext);
     return;
   }
 
@@ -91,7 +101,7 @@ void LgNetCastClient::tryProcessNext() {
     return;
   }
 
-  const int cmd = m_queue.dequeue();
+  const Command cmd = m_queue.dequeue();
   m_inFlight = true;
 
   const QString url =
@@ -102,7 +112,7 @@ void LgNetCastClient::tryProcessNext() {
                      "<name>HandleKeyInput</name>"
                      "<value>%2</value></command>")
           .arg(m_session)
-          .arg(cmd)
+          .arg(static_cast<int>(cmd))
           .toUtf8();
 
   post(url, body, [this](int code, QByteArray) {
@@ -112,3 +122,5 @@ void LgNetCastClient::tryProcessNext() {
     tryProcessNext();
   });
 }
+
+} // namespace lgremote

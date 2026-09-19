@@ -1,7 +1,4 @@
 #include "ui/PairingScreen.hpp"
-#include "data/AppContainer.hpp"
-#include "net/LgNetCastClient.hpp"
-#include "theme/Theme.hpp"
 
 #include <QFormLayout>
 #include <QLabel>
@@ -11,7 +8,12 @@
 #include <QRegularExpression>
 #include <QVBoxLayout>
 
-PairingScreen::PairingScreen(AppContainer *container, QWidget *parent)
+#include <lgremote/app_container.hpp>
+#include <lgremote/client.hpp>
+
+#include "theme/Theme.hpp"
+
+PairingScreen::PairingScreen(lgremote::AppContainer *container, QWidget *parent)
     : QWidget(parent), m_container(container) {
 
   auto *root = new QVBoxLayout(this);
@@ -50,7 +52,7 @@ PairingScreen::PairingScreen(AppContainer *container, QWidget *parent)
   root->addWidget(m_confirmBtn);
 
   m_progress = new QProgressBar(this);
-  m_progress->setRange(0, 0); // бесконечный
+  m_progress->setRange(0, 0);
   m_progress->setVisible(false);
   root->addWidget(m_progress);
 
@@ -93,7 +95,7 @@ void PairingScreen::requestKey() {
   setLoading(true);
 
   m_activeClient = m_container->createClient(ip);
-  connect(m_activeClient, &LgNetCastClient::pairingKeyResult, this,
+  connect(m_activeClient, &lgremote::Client::pairingKeyResult, this,
           [this](bool ok) {
             setLoading(false);
             if (ok)
@@ -121,7 +123,7 @@ void PairingScreen::confirm() {
   setLoading(true);
 
   m_activeClient = m_container->createClient(ip);
-  connect(m_activeClient, &LgNetCastClient::pairingConfirmResult, this,
+  connect(m_activeClient, &lgremote::Client::pairingConfirmResult, this,
           [this, ip](const QString &session) {
             setLoading(false);
             if (session.isEmpty()) {
