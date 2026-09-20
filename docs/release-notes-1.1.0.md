@@ -1,86 +1,72 @@
-# LG Лентяйка 1.1.0
+# LazyTV 1.1.0
 
-**Первый релиз с публичным API.** Ядро проекта теперь оформлено как
-переиспользуемая C++/Qt6-библиотека, а само приложение собирается
-поверх неё.
+**Первое издание под новым именем LazyTV.**
+
+Приложение переименовано из `lgremote` в `lazytv`, чтобы избежать
+использования торговой марки LG в названии. Функциональность
+не изменилась.
 
 ---
 
 ## Что нового
 
-### 📚 Библиотека для разработчиков
+### 🏷 Новое имя
 
-Протокол LG NetCast вынесен в отдельную библиотеку, которую можно
-использовать в своих приложениях:
+- Пакет: `lgremote` → `lazytv`
+- Приложение в меню: `LgRemote` → `LazyTV`
+- Команда: `lgremote` → `lazytv`
+- PPA: `ppa:mindwork64/lgremote` → `ppa:mindwork64/lazytv`
+- Namespace: `lgremote::` → `lazytv::`
+- CMake-цели: `LgRemote::Core` → `LazyTV::Core`, `LgRemote::Client` → `LazyTV::Client`
+- Заголовки: `#include <lgremote/...>` → `#include <lazytv/...>`
+- Конфиг: `~/.config/lgremote/` → `~/.config/lazytv/`
 
-```cmake
-find_package(LgRemote REQUIRED)
-target_link_libraries(my_app PRIVATE LgRemote::Core)
-```
+### 📦 Установка
 
-```cpp
-#include <lgremote/client.hpp>
-
-lgremote::Client client("192.168.1.42");
-client.requestPairingKey();
-client.sendCommand(lgremote::Client::Command::Power);
-```
-
-Два уровня API:
-
-- **`LgRemote::Core`** — только протокол (класс `lgremote::Client`)
-- **`LgRemote::Client`** — то же + JSON-хранилище сессии и управление
-  жизненным циклом клиента
-
-Пример использования: [`examples/minimal_client/`](examples/minimal_client/).
-
-### 🏗 Установка библиотеки
+**Ubuntu 24.04:**
 
 ```bash
-cmake --install build --prefix /usr/local
+sudo add-apt-repository ppa:mindwork64/lazytv
+sudo apt update
+sudo apt install lazytv
 ```
 
-Устанавливаются заголовки, статические библиотеки и CMake-конфиги,
-так что `find_package(LgRemote)` работает из коробки.
+**Другие дистрибутивы:** скачайте `lazytv-1.1.0-x86_64.AppImage`
+со страницы релиза.
 
-### 🔧 Внутренние изменения
+### ⚠️ Важно при обновлении
 
-- Публичный API в `namespace lgremote`
-- Заголовки переехали в `include/lgremote/`
-- Приватные `.hpp` удалены из `src/net/` и `src/data/`
-- CMake: три цели — `lgremote-core`, `lgremote`, `lgremote-app`
-- Экспорт имён: `LgRemote::Core`, `LgRemote::Client`
+- Старый пакет `lgremote` необходимо удалить: `sudo apt remove lgremote`
+- Старый конфиг `~/.config/lgremote/` переносится вручную:
+
+  ```bash
+  mv ~/.config/lgremote ~/.config/lazytv
+  ```
+
+  Или, если не важна сохранённая сессия, просто подключитесь заново.
 
 ---
 
 ## Что осталось как было
 
-- Все функции приложения не изменились
-- Сопряжение, D-Pad, рокеры, цифровая клавиатура, настройки — как в 1.0.0
-- AppImage собирается тем же способом
-- Jenkins-пайплайн работает без изменений
+- Весь функционал пульта без изменений
+- Сопряжение, D-Pad, рокеры, цифровая клавиатура, настройки
+- Все три способа установки: PPA, AppImage, из исходников
+- Использование как библиотеки через `find_package(LazyTV)`
 
 ---
 
 ## Скачать
 
 | Файл | Описание |
-|---|---|
-| `lgremote-1.1.0-x86_64.AppImage` | Самодостаточный бинарник (35 МБ) |
-| `lgremote-1.1.0-x86_64.AppImage.sha256` | Контрольная сумма |
+| --- | --- |
+| `lazytv-1.1.0-x86_64.AppImage` | Самодостаточный бинарник (35 МБ) |
+| `lazytv-1.1.0-x86_64.AppImage.sha256` | Контрольная сумма |
 
 ```bash
-chmod +x lgremote-1.1.0-x86_64.AppImage
-./lgremote-1.1.0-x86_64.AppImage
+chmod +x lazytv-1.1.0-x86_64.AppImage
+./lazytv-1.1.0-x86_64.AppImage
 ```
-
----
-
-## Обновление с 1.0.0
-
-Просто запустите новый AppImage. Файл конфигурации
-`~/.config/lgremote/config.json` совместим — сессия сохранится,
-код сопряжения вводить не нужно.
 
 ---
 
@@ -90,4 +76,4 @@ chmod +x lgremote-1.1.0-x86_64.AppImage
 - Qt 6.4+ для сборки из исходников
 - Телевизоры LG с поддержкой NetCast (2010–2014)
 
-Полное описание — в [README](https://github.com/mindwork64/lgremote-qt#readme).
+Полное описание — в [README](https://github.com/mindwork64/lazytv#readme).

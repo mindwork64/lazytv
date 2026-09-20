@@ -1,4 +1,4 @@
-# LG Лентяйка
+# LazyTV
 
 **Пульт для телевизоров LG NetCast прямо в вашем компьютере.**
 
@@ -7,6 +7,7 @@
 2010–2014 годов, а также часть более новых с включённым режимом совместимости).
 Работает по локальной сети, без облаков, без регистрации, без сбора данных.
 
+![Скриншот главного экрана](docs/screenshot-main.png)
 
 ---
 
@@ -17,7 +18,7 @@
 и ждёт. Иногда просто удобнее управлять телевизором с клавиатуры ноутбука,
 чем тянуться за пультом на другой конец дивана.
 
-**LG Лентяйка** решает эти проблемы. Установил один раз — и у тебя всегда под
+**LazyTV** решает эти проблемы. Установил один раз — и у тебя всегда под
 рукой виртуальный пульт: все кнопки, все функции, от громкости до цифрового
 меню. Работает через ту же Wi-Fi сеть, к которой подключён телевизор.
 
@@ -43,6 +44,7 @@
 Всё. Дальше приложение запомнит сессию, и при следующем запуске сразу откроет
 пульт — вводить код заново не нужно.
 
+![Экран сопряжения](docs/screenshot-pairing.png)
 
 ---
 
@@ -65,6 +67,7 @@
 PIN-кодов в родительском контроле, поиска в YouTube, ввода паролей от
 приложений Smart TV.
 
+![Цифровая клавиатура](docs/screenshot-keypad.png)
 
 ### Настройки
 
@@ -73,6 +76,7 @@ PIN-кодов в родительском контроле, поиска в You
 - **Три темы оформления**: тёмная, светлая, системная
 - Информация о версии
 
+![Настройки](docs/screenshot-settings.png)
 
 ### Индикатор состояния
 
@@ -105,30 +109,30 @@ Qt-приложений и не создаёт проблем.
 приходят вместе с системными.
 
 ```bash
-sudo add-apt-repository ppa:mindwork64/lgremote
+sudo add-apt-repository ppa:mindwork64/lazytv
 sudo apt update
-sudo apt install lgremote
+sudo apt install lazytv
 ```
 
 Запуск:
 
 ```bash
-lgremote
+lazytv
 ```
 
-Или через меню приложений — там появится **LgRemote** с иконкой.
+Или через меню приложений — там появится **LazyTV** с иконкой.
 
 **Для более старых версий Ubuntu** (22.04 и старше) — используйте AppImage
 или сборку из исходников, так как PPA собирается только для `noble`.
 
 ### Вариант 2 — AppImage (самый универсальный)
 
-Скачайте `lgremote-1.1.0-x86_64.AppImage` со страницы
-[последнего релиза](https://github.com/mindwork64/lgremote-qt/releases/latest).
+Скачайте `lazytv-1.1.0-x86_64.AppImage` со страницы
+[последнего релиза](https://github.com/mindwork64/lazytv/releases/latest).
 
 ```bash
-chmod +x lgremote-1.1.0-x86_64.AppImage
-./lgremote-1.1.0-x86_64.AppImage
+chmod +x lazytv-1.1.0-x86_64.AppImage
+./lazytv-1.1.0-x86_64.AppImage
 ```
 
 Никаких зависимостей устанавливать не нужно — Qt и все библиотеки упакованы
@@ -146,14 +150,14 @@ sudo apt install libfuse2         # Ubuntu 22.04 и старше
 Или запустите без FUSE (медленнее стартует, но работает):
 
 ```bash
-./lgremote-1.1.0-x86_64.AppImage --appimage-extract-and-run
+./lazytv-1.1.0-x86_64.AppImage --appimage-extract-and-run
 ```
 
 ### Вариант 3 — из исходников
 
 ```bash
-git clone https://github.com/mindwork64/lgremote-qt.git
-cd lgremote-qt
+git clone https://github.com/mindwork64/lazytv.git
+cd lazytv
 
 # Зависимости (Ubuntu/Debian)
 sudo apt install build-essential cmake qt6-base-dev qt6-svg-dev libgl1-mesa-dev
@@ -165,14 +169,14 @@ cmake -B build -S . -DCMAKE_BUILD_TYPE=Release \
 
 cmake --build build -j$(nproc)
 
-./build/lgremote
+./build/lazytv
 ```
 
 ---
 
 ## Поддерживаемые телевизоры
 
-LG Лентяйка работает с моделями LG, которые поддерживают **NetCast** —
+LazyTV работает с моделями LG, которые поддерживают **NetCast** —
 фирменный протокол LG для удалённого управления. В основном это
 телевизоры 2010–2014 годов:
 
@@ -181,7 +185,7 @@ LG Лентяйка работает с моделями LG, которые по
 - Большинство **Smart TV** с поддержкой второго экрана
 
 **Проверка:** если официальное мобильное приложение «LG TV Remote» работает
-с вашим телевизором — LG Лентяйка тоже будет работать. Если не работает —
+с вашим телевизором — LazyTV тоже будет работать. Если не работает —
 с высокой вероятностью тоже не будет.
 
 **Не поддерживаются** телевизоры на **webOS** (2014+), для которых
@@ -192,14 +196,14 @@ LG Лентяйка работает с моделями LG, которые по
 
 ## Где хранятся настройки
 
-Один файл: `~/.config/lgremote/config.json`. Там только IP-адрес телевизора,
+Один файл: `~/.config/lazytv/config.json`. Там только IP-адрес телевизора,
 токен сессии и выбранная тема оформления. Ничего личного, никакой
 телеметрии, никакой отправки данных наружу.
 
 Удалить все настройки:
 
 ```bash
-rm -rf ~/.config/lgremote
+rm -rf ~/.config/lazytv
 ```
 
 Или через интерфейс: **Настройки → Отключиться и забыть сессию**.
@@ -284,8 +288,8 @@ sudo gtk-update-icon-cache /usr/share/icons/hicolor
 └───────────────────────┬──────────────────────────┘
                         │ сигналы/слоты
 ┌───────────────────────▼──────────────────────────┐
-│  lgremote::AppContainer                          │
-│  ├── SessionStore (JSON в ~/.config/lgremote/)   │
+│  lazytv::AppContainer                            │
+│  ├── SessionStore (JSON в ~/.config/lazytv/)     │
 │  └── Client (QNetworkAccessManager)              │
 └───────────────────────┬──────────────────────────┘
                         │ HTTP POST
@@ -293,7 +297,7 @@ sudo gtk-update-icon-cache /usr/share/icons/hicolor
                   [Телевизор LG]
 ```
 
-Исходный код доступен на GitHub: **mindwork64/lgremote-qt**.
+Исходный код доступен на GitHub: **mindwork64/lazytv**.
 
 ---
 
@@ -306,8 +310,8 @@ sudo gtk-update-icon-cache /usr/share/icons/hicolor
 ### Установка
 
 ```bash
-git clone https://github.com/mindwork64/lgremote-qt.git
-cd lgremote-qt
+git clone https://github.com/mindwork64/lazytv.git
+cd lazytv
 cmake -B build -S . -DCMAKE_BUILD_TYPE=Release
 cmake --build build -j
 sudo cmake --install build --prefix /usr/local
@@ -316,26 +320,26 @@ sudo cmake --install build --prefix /usr/local
 После установки доступны два уровня API:
 
 | CMake-цель | Что внутри |
-|---|---|
-| `LgRemote::Core` | Только протокол: класс `lgremote::Client` для сопряжения и команд |
-| `LgRemote::Client` | То же + `lgremote::SessionStore` (JSON-конфиг) и `lgremote::AppContainer` |
+| --- | --- |
+| `LazyTV::Core` | Только протокол: класс `lazytv::Client` для сопряжения и команд |
+| `LazyTV::Client` | То же + `lazytv::SessionStore` (JSON-конфиг) и `lazytv::AppContainer` |
 
 ### Пример использования
 
 ```cpp
 #include <QCoreApplication>
 #include <QDebug>
-#include <lgremote/client.hpp>
+#include <lazytv/client.hpp>
 
 int main(int argc, char** argv) {
     QCoreApplication app(argc, argv);
 
-    lgremote::Client client("192.168.1.42");
+    lazytv::Client client("192.168.1.42");
 
-    QObject::connect(&client, &lgremote::Client::pairingKeyResult,
+    QObject::connect(&client, &lazytv::Client::pairingKeyResult,
         [](bool ok) { qInfo() << "Key request:" << ok; });
 
-    QObject::connect(&client, &lgremote::Client::pairingConfirmResult,
+    QObject::connect(&client, &lazytv::Client::pairingConfirmResult,
         [&](const QString& session) {
             if (session.isEmpty()) {
                 qWarning() << "Pairing rejected";
@@ -343,10 +347,10 @@ int main(int argc, char** argv) {
                 return;
             }
             client.setSession(session);
-            client.sendCommand(lgremote::Client::Command::Power);
+            client.sendCommand(lazytv::Client::Command::Power);
         });
 
-    QObject::connect(&client, &lgremote::Client::commandResult,
+    QObject::connect(&client, &lazytv::Client::commandResult,
         [&](bool ok) { app.exit(ok ? 0 : 2); });
 
     client.requestPairingKey();
@@ -364,10 +368,10 @@ set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_AUTOMOC ON)
 
 find_package(Qt6 REQUIRED COMPONENTS Core)
-find_package(LgRemote REQUIRED)
+find_package(LazyTV REQUIRED)
 
 qt_add_executable(my_remote main.cpp)
-target_link_libraries(my_remote PRIVATE LgRemote::Core)
+target_link_libraries(my_remote PRIVATE LazyTV::Core)
 ```
 
 Полный пример — в [`examples/minimal_client/`](examples/minimal_client/).
@@ -383,27 +387,27 @@ target_link_libraries(my_remote PRIVATE LgRemote::Core)
 ```bash
 # Создать рабочую копию с правильным именем папки
 cd ~/apps
-mkdir -p lgremote-1.1.0+repack2
-cd lgremote-qt
-git archive --format=tar --prefix=lgremote-1.1.0+repack2/ HEAD \
+mkdir -p lazytv-1.1.0
+cd lazytv
+git archive --format=tar --prefix=lazytv-1.1.0/ HEAD \
     | tar -x -C ~/apps/
 
 # Orig-архив без debian/
 cd ~/apps
-tar -czf lgremote_1.1.0+repack2.orig.tar.gz \
-    --exclude='lgremote-1.1.0+repack2/debian' \
-    lgremote-1.1.0+repack2/
+tar -czf lazytv_1.1.0.orig.tar.gz \
+    --exclude='lazytv-1.1.0/debian' \
+    lazytv-1.1.0/
 
 # Source-пакет
-cd ~/apps/lgremote-1.1.0+repack2
+cd ~/apps/lazytv-1.1.0
 chmod +x debian/rules
 rm -f debian/files
 debuild -S -sa -k<ваш-GPG-key-id>
 
 # Проверка и загрузка
 cd ~/apps
-lintian lgremote_1.1.0+repack2-1_source.changes
-dput lgremote lgremote_1.1.0+repack2-1_source.changes
+lintian lazytv_1.1.0-1_source.changes
+dput lazytv lazytv_1.1.0-1_source.changes
 ```
 
 Структура `debian/`:
@@ -411,7 +415,7 @@ dput lgremote lgremote_1.1.0+repack2-1_source.changes
 - `changelog` — история версий
 - `control` — метаданные и зависимости сборки
 - `copyright` — лицензия
-- `rules` — скрипт сборки (передаёт `-DLGREMOTE_INSTALL_LIB=OFF`)
+- `rules` — скрипт сборки (передаёт `-DLAZYTV_INSTALL_LIB=OFF`)
 - `source/format` — формат `3.0 (quilt)`
 - `watch` — проверка новых версий через uscan
 
@@ -423,7 +427,7 @@ dput lgremote lgremote_1.1.0+repack2-1_source.changes
 подготовка агента — в `jenkins/setup-agent.sh`.
 
 **Launchpad PPA** — автоматическая сборка `.deb` при загрузке source-пакета.
-[Подробнее](https://launchpad.net/~mindwork64/+archive/ubuntu/lgremote).
+[Подробнее](https://launchpad.net/~mindwork64/+archive/ubuntu/lazytv).
 
 ---
 
