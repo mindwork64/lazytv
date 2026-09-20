@@ -1,12 +1,12 @@
 [Desktop Entry]
 Type=Application
-Name=LgRemote
+Name=LazyTV
 GenericName=TV Remote
 Comment=Control your LG NetCast TV from your computer
-Exec=lgremote
-Icon=lgremote
+Exec=lazytv
+Icon=lazytv
 Terminal=false
 Categories=AudioVideo;
-Keywords=LG;TV;Remote;NetCast;Pult;телевизор;пульт;
+Keywords=LG;TV;Remote;NetCast;LazyTV;
 StartupNotify=true
-StartupWMClass=lgremote
+StartupWMClass=lazytv

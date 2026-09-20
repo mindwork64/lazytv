@@ -1,7 +1,7 @@
-#include <lgremote/app_container.hpp>
-#include <lgremote/client.hpp>
+#include <lazytv/app_container.hpp>
+#include <lazytv/client.hpp>
 
-namespace lgremote {
+namespace lazytv {
 
 AppContainer::AppContainer() = default;
 AppContainer::~AppContainer() = default;
@@ -33,4 +33,4 @@ void AppContainer::clearSession() {
   m_client.reset();
 }
 
-} // namespace lgremote
+} // namespace lazytv

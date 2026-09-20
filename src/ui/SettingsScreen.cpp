@@ -7,19 +7,17 @@
 #include <QRadioButton>
 #include <QVBoxLayout>
 
-#include <lgremote/app_container.hpp>
+#include <lazytv/app_container.hpp>
 
 #include "theme/Theme.hpp"
 
-SettingsScreen::SettingsScreen(lgremote::AppContainer *container,
-                               QWidget *parent)
+SettingsScreen::SettingsScreen(lazytv::AppContainer *container, QWidget *parent)
     : QWidget(parent), m_container(container) {
 
   auto *root = new QVBoxLayout(this);
   root->setContentsMargins(16, 16, 16, 16);
   root->setSpacing(16);
 
-  // Заголовок
   auto *header = new QHBoxLayout;
   auto *backBtn = new QPushButton("← Назад", this);
   connect(backBtn, &QPushButton::clicked, this, &SettingsScreen::back);
@@ -33,7 +31,6 @@ SettingsScreen::SettingsScreen(lgremote::AppContainer *container,
   header->addStretch();
   root->addLayout(header);
 
-  // Телевизор
   root->addWidget(new QLabel("Телевизор", this));
 
   m_ipLabel = new QLabel(this);
@@ -43,7 +40,6 @@ SettingsScreen::SettingsScreen(lgremote::AppContainer *container,
   connect(disc, &QPushButton::clicked, this, &SettingsScreen::disconnect);
   root->addWidget(disc);
 
-  // Разделитель
   auto mkLine = [this]() {
     auto *line = new QFrame(this);
     line->setFrameShape(QFrame::HLine);
@@ -54,7 +50,6 @@ SettingsScreen::SettingsScreen(lgremote::AppContainer *container,
   };
   root->addWidget(mkLine());
 
-  // Тема
   root->addWidget(new QLabel("Тема", this));
 
   const int mode = m_container->store().themeMode();
@@ -83,9 +78,8 @@ SettingsScreen::SettingsScreen(lgremote::AppContainer *container,
 
   root->addWidget(mkLine());
 
-  // Версия
   root->addWidget(new QLabel("Версия", this));
-  root->addWidget(new QLabel("1.0.0 (1)", this));
+  root->addWidget(new QLabel("1.1.0 (1)", this));
 
   root->addStretch();
   refresh();

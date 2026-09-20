@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.21)
-project(lgremote VERSION 1.1.0 LANGUAGES CXX)
+project(lazytv VERSION 1.1.0 LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -11,7 +11,7 @@ include(GNUInstallDirs)
 
 # Опция: устанавливать библиотечные файлы (заголовки, .a, CMake config).
 # Для PPA-пакета выключается, чтобы в .deb попал только исполняемый файл.
-option(LGREMOTE_INSTALL_LIB
+option(LAZYTV_INSTALL_LIB
     "Install library files (headers, static libs, CMake configs)"
     ON)
 
@@ -20,51 +20,51 @@ find_package(Qt6 REQUIRED COMPONENTS Core Gui Widgets Network Svg)
 qt_standard_project_setup()
 
 # =====================================================================
-# liblgremote-core — протокол LG NetCast, без UI и без persistence
+# liblazytv-core — протокол LG NetCast, без UI и без persistence
 # =====================================================================
-add_library(lgremote-core STATIC
-    src/net/LgNetCastClient.cpp
-    include/lgremote/client.hpp
-    include/lgremote/lgremote_export.h
+add_library(lazytv-core STATIC
+    src/net/NetCastClient.cpp
+    include/lazytv/client.hpp
+    include/lazytv/lazytv_export.h
 )
-add_library(LgRemote::Core ALIAS lgremote-core)
+add_library(LazyTV::Core ALIAS lazytv-core)
 
-set_target_properties(lgremote-core PROPERTIES EXPORT_NAME Core)
+set_target_properties(lazytv-core PROPERTIES EXPORT_NAME Core)
 
-target_include_directories(lgremote-core
+target_include_directories(lazytv-core
     PUBLIC
         $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
         $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>
 )
 
-target_link_libraries(lgremote-core
+target_link_libraries(lazytv-core
     PUBLIC
         Qt6::Core
         Qt6::Network
 )
 
 # =====================================================================
-# liblgremote — core + SessionStore + AppContainer
+# liblazytv — core + SessionStore + AppContainer
 # =====================================================================
-add_library(lgremote STATIC
+add_library(lazytv STATIC
     src/data/SessionStore.cpp
     src/data/AppContainer.cpp
-    include/lgremote/session_store.hpp
-    include/lgremote/app_container.hpp
-    include/lgremote/lgremote.h
+    include/lazytv/session_store.hpp
+    include/lazytv/app_container.hpp
+    include/lazytv/lazytv.h
 )
-add_library(LgRemote::Client ALIAS lgremote)
+add_library(LazyTV::Client ALIAS lazytv)
 
-set_target_properties(lgremote PROPERTIES EXPORT_NAME Client)
+set_target_properties(lazytv PROPERTIES EXPORT_NAME Client)
 
-target_link_libraries(lgremote
-    PUBLIC lgremote-core
+target_link_libraries(lazytv
+    PUBLIC lazytv-core
 )
 
 # =====================================================================
 # Приложение
 # =====================================================================
-qt_add_executable(lgremote-app
+qt_add_executable(lazytv-app
     src/main.cpp
     src/theme/Theme.cpp
     src/ui/MainWindow.cpp
@@ -79,71 +79,71 @@ qt_add_executable(lgremote-app
     resources/resources.qrc
 )
 
-target_include_directories(lgremote-app PRIVATE src)
+target_include_directories(lazytv-app PRIVATE src)
 
-target_link_libraries(lgremote-app PRIVATE
-    lgremote
+target_link_libraries(lazytv-app PRIVATE
+    lazytv
     Qt6::Widgets
     Qt6::Svg
 )
 
-set_target_properties(lgremote-app PROPERTIES OUTPUT_NAME lgremote)
+set_target_properties(lazytv-app PROPERTIES OUTPUT_NAME lazytv)
 
 # =====================================================================
 # Установка библиотеки (опционально)
 # =====================================================================
-if(LGREMOTE_INSTALL_LIB)
+if(LAZYTV_INSTALL_LIB)
     include(CMakePackageConfigHelpers)
 
-    install(TARGETS lgremote-core lgremote
-        EXPORT LgRemoteTargets
+    install(TARGETS lazytv-core lazytv
+        EXPORT LazyTVTargets
         ARCHIVE  DESTINATION ${CMAKE_INSTALL_LIBDIR}
         LIBRARY  DESTINATION ${CMAKE_INSTALL_LIBDIR}
         RUNTIME  DESTINATION ${CMAKE_INSTALL_BINDIR}
         INCLUDES DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
     )
 
-    install(DIRECTORY include/lgremote
+    install(DIRECTORY include/lazytv
         DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
     )
 
-    install(EXPORT LgRemoteTargets
-        FILE LgRemoteTargets.cmake
-        NAMESPACE LgRemote::
-        DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/LgRemote
+    install(EXPORT LazyTVTargets
+        FILE LazyTVTargets.cmake
+        NAMESPACE LazyTV::
+        DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/LazyTV
     )
 
     configure_package_config_file(
-        cmake/LgRemoteConfig.cmake.in
-        ${CMAKE_CURRENT_BINARY_DIR}/LgRemoteConfig.cmake
-        INSTALL_DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/LgRemote
+        cmake/LazyTVConfig.cmake.in
+        ${CMAKE_CURRENT_BINARY_DIR}/LazyTVConfig.cmake
+        INSTALL_DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/LazyTV
     )
 
     write_basic_package_version_file(
-        ${CMAKE_CURRENT_BINARY_DIR}/LgRemoteConfigVersion.cmake
+        ${CMAKE_CURRENT_BINARY_DIR}/LazyTVConfigVersion.cmake
         VERSION ${PROJECT_VERSION}
         COMPATIBILITY SameMajorVersion
     )
 
     install(FILES
-        ${CMAKE_CURRENT_BINARY_DIR}/LgRemoteConfig.cmake
-        ${CMAKE_CURRENT_BINARY_DIR}/LgRemoteConfigVersion.cmake
-        DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/LgRemote
+        ${CMAKE_CURRENT_BINARY_DIR}/LazyTVConfig.cmake
+        ${CMAKE_CURRENT_BINARY_DIR}/LazyTVConfigVersion.cmake
+        DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/LazyTV
     )
 endif()
 
 # =====================================================================
 # Установка приложения (всегда)
 # =====================================================================
-install(TARGETS lgremote-app
+install(TARGETS lazytv-app
     RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
 )
 
-install(FILES lgremote.desktop
+install(FILES lazytv.desktop
     DESTINATION ${CMAKE_INSTALL_DATAROOTDIR}/applications
 )
 
 install(FILES resources/ic_launcher.svg
     DESTINATION ${CMAKE_INSTALL_DATAROOTDIR}/icons/hicolor/scalable/apps
-    RENAME lgremote.svg
+    RENAME lazytv.svg
 )

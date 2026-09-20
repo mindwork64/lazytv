@@ -2,10 +2,10 @@
 
 #include <QWidget>
 
-namespace lgremote {
+namespace lazytv {
 class AppContainer;
 class Client;
-} // namespace lgremote
+} // namespace lazytv
 
 class QLineEdit;
 class QLabel;
@@ -15,7 +15,7 @@ class QProgressBar;
 class PairingScreen : public QWidget {
   Q_OBJECT
 public:
-  explicit PairingScreen(lgremote::AppContainer *container,
+  explicit PairingScreen(lazytv::AppContainer *container,
                          QWidget *parent = nullptr);
 
 signals:
@@ -28,7 +28,7 @@ private:
   void setInfo(const QString &);
   void setError(const QString &);
 
-  lgremote::AppContainer *m_container;
+  lazytv::AppContainer *m_container;
   QLineEdit *m_ip;
   QLineEdit *m_key;
   QPushButton *m_reqBtn;
@@ -36,5 +36,5 @@ private:
   QProgressBar *m_progress;
   QLabel *m_infoLabel;
   QLabel *m_errorLabel;
-  lgremote::Client *m_activeClient = nullptr;
+  lazytv::Client *m_activeClient = nullptr;
 };

@@ -25,15 +25,15 @@ ui_*.h
 *~
 
 # PPA artifacts
-lgremote_*.orig.tar.gz
-lgremote_*.dsc
-lgremote_*.debian.tar.xz
-lgremote_*.changes
-lgremote_*.buildinfo
-lgremote_*.build
+lazytv_*.orig.tar.gz
+lazytv_*.dsc
+lazytv_*.debian.tar.xz
+lazytv_*.changes
+lazytv_*.buildinfo
+lazytv_*.build
 
 # sha256 только для бинарных сборок
-lgremote-*-x86_64.AppImage.sha256
+lazytv-*-x86_64.AppImage.sha256
 
 # Temporary copy for linuxdeploy (created from resources/ic_launcher.svg)
-lgremote.svg
+lazytv.svg

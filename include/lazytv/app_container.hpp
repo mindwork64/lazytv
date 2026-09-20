@@ -3,10 +3,10 @@
 #include <QString>
 #include <memory>
 
-#include <lgremote/lgremote_export.h>
-#include <lgremote/session_store.hpp>
+#include <lazytv/lazytv_export.h>
+#include <lazytv/session_store.hpp>
 
-namespace lgremote {
+namespace lazytv {
 
 class Client;
 
@@ -16,7 +16,7 @@ class Client;
  * Управляет жизненным циклом активного Client, восстанавливает сессию
  * из SessionStore. Не потокобезопасен.
  */
-class LGREMOTE_EXPORT AppContainer {
+class LAZYTV_EXPORT AppContainer {
 public:
   AppContainer();
   ~AppContainer();
@@ -48,4 +48,4 @@ private:
   std::unique_ptr<Client> m_client;
 };
 
-} // namespace lgremote
+} // namespace lazytv

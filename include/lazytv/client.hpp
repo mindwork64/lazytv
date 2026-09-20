@@ -6,11 +6,11 @@
 
 #include <functional>
 
-#include <lgremote/lgremote_export.h>
+#include <lazytv/lazytv_export.h>
 
 class QNetworkAccessManager;
 
-namespace lgremote {
+namespace lazytv {
 
 /**
  * Клиент LG NetCast.
@@ -26,7 +26,7 @@ namespace lgremote {
  *   4. Сохранить session, при следующих запусках — client.setSession(session);
  *   5. client.sendCommand(Client::Command::Power); // и т.д.
  */
-class LGREMOTE_EXPORT Client : public QObject {
+class LAZYTV_EXPORT Client : public QObject {
   Q_OBJECT
 public:
   static constexpr int kPort = 8080;
@@ -134,4 +134,4 @@ private:
   qint64 m_lastCommandAt = 0;
 };
 
-} // namespace lgremote
+} // namespace lazytv

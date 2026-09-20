@@ -1,4 +1,4 @@
-#include <lgremote/session_store.hpp>
+#include <lazytv/session_store.hpp>
 
 #include <QDir>
 #include <QFile>
@@ -6,13 +6,13 @@
 #include <QJsonObject>
 #include <QStandardPaths>
 
-namespace lgremote {
+namespace lazytv {
 
 SessionStore::SessionStore() {
   const QString base =
       QStandardPaths::writableLocation(QStandardPaths::GenericConfigLocation);
-  QDir().mkpath(base + "/lgremote");
-  m_path = base + "/lgremote/config.json";
+  QDir().mkpath(base + "/lazytv");
+  m_path = base + "/lazytv/config.json";
   load();
 }
 
@@ -71,4 +71,4 @@ void SessionStore::clearAll() {
   save();
 }
 
-} // namespace lgremote
+} // namespace lazytv

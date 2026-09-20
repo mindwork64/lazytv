@@ -4,6 +4,6 @@ include(CMakeFindDependencyMacro)
 
 find_dependency(Qt6 COMPONENTS Core Network)
 
-include("${CMAKE_CURRENT_LIST_DIR}/LgRemoteTargets.cmake")
+include("${CMAKE_CURRENT_LIST_DIR}/LazyTVTargets.cmake")
 
-check_required_components(LgRemote)
+check_required_components(LazyTV)

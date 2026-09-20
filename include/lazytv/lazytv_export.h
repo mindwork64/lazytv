@@ -3,4 +3,4 @@
 // Для STATIC-библиотек экспорт не требуется.
 // Макрос оставлен для будущей поддержки SHARED-сборки.
 
-#define LGREMOTE_EXPORT
+#define LAZYTV_EXPORT

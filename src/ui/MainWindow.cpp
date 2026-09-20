@@ -2,17 +2,17 @@
 
 #include <QStackedWidget>
 
-#include <lgremote/app_container.hpp>
+#include <lazytv/app_container.hpp>
 
 #include "theme/Theme.hpp"
 #include "ui/PairingScreen.hpp"
 #include "ui/RemoteScreen.hpp"
 #include "ui/SettingsScreen.hpp"
 
-MainWindow::MainWindow(lgremote::AppContainer *container)
+MainWindow::MainWindow(lazytv::AppContainer *container)
     : QMainWindow(nullptr), m_container(container) {
 
-  setWindowTitle("LG Лентяйка");
+  setWindowTitle("LazyTV");
   setWindowIcon(QIcon(":/ic_launcher.svg"));
   resize(420, 820);
   setMinimumSize(380, 600);

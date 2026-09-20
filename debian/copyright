@@ -1,6 +1,6 @@
-Format: https://www.debian.org/doc/packaging-manuals/copyright-format/1.0/
-Upstream-Name: lgremote
-Source: https://github.com/mindwork64/lgremote-qt
+Format: <https://www.debian.org/doc/packaging-manuals/copyright-format/1.0/>
+Upstream-Name: lazytv
+Source: <https://github.com/mindwork64/lazytv>
 
 Files: *
 Copyright: 2026 mindwork64 <vmurashov85@gmail.com>

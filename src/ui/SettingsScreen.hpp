@@ -2,7 +2,7 @@
 
 #include <QWidget>
 
-namespace lgremote {
+namespace lazytv {
 class AppContainer;
 }
 
@@ -12,7 +12,7 @@ class QRadioButton;
 class SettingsScreen : public QWidget {
   Q_OBJECT
 public:
-  explicit SettingsScreen(lgremote::AppContainer *container,
+  explicit SettingsScreen(lazytv::AppContainer *container,
                           QWidget *parent = nullptr);
 
   void refresh();
@@ -23,7 +23,7 @@ signals:
   void themeModeChanged(int);
 
 private:
-  lgremote::AppContainer *m_container;
+  lazytv::AppContainer *m_container;
   QLabel *m_ipLabel = nullptr;
   QRadioButton *m_sys = nullptr;
   QRadioButton *m_dark = nullptr;

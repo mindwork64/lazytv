@@ -2,11 +2,11 @@
 
 #include <QWidget>
 
-#include <lgremote/client.hpp>
+#include <lazytv/client.hpp>
 
-#include "ui/widgets/StatusBar.hpp" // ConnectionStatus
+#include "ui/widgets/StatusBar.hpp"
 
-namespace lgremote {
+namespace lazytv {
 class AppContainer;
 }
 
@@ -17,7 +17,7 @@ class QTimer;
 class RemoteScreen : public QWidget {
   Q_OBJECT
 public:
-  explicit RemoteScreen(lgremote::AppContainer *container,
+  explicit RemoteScreen(lazytv::AppContainer *container,
                         QWidget *parent = nullptr);
 
 signals:
@@ -31,12 +31,12 @@ private:
   QWidget *buildMainPage();
   QWidget *buildNumbersPage();
 
-  void sendCommand(lgremote::Client::Command cmd);
+  void sendCommand(lazytv::Client::Command cmd);
   void onCommandResult(bool ok);
   void recomputeStatus();
   void updateErrorBannerStyle();
 
-  lgremote::AppContainer *m_container = nullptr;
+  lazytv::AppContainer *m_container = nullptr;
   StatusBar *m_statusBar = nullptr;
   QStackedWidget *m_pages = nullptr;
   QLabel *m_errorBanner = nullptr;

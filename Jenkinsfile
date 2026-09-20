@@ -10,7 +10,7 @@ pipeline {
 
     environment {
         QT_PREFIX   = '/usr/lib/x86_64-linux-gnu/cmake'
-        APP_VERSION = '1.0.0'
+        APP_VERSION = '1.1.0'
     }
 
     stages {
@@ -58,15 +58,15 @@ pipeline {
                     set -eu
                     cmake --build build -j$(nproc)
 
-                    ls -la build/lgremote
-                    file build/lgremote | tee /tmp/lgremote-type
+                    ls -la build/lazytv
+                    file build/lazytv | tee /tmp/lazytv-type
 
-                    if ! grep -q "dynamically linked" /tmp/lgremote-type; then
+                    if ! grep -q "dynamically linked" /tmp/lazytv-type; then
                         echo "Бинарник статический или повреждён — прерываем."
                         exit 1
                     fi
 
-                    size=$(stat -c%s build/lgremote)
+                    size=$(stat -c%s build/lazytv)
                     if [ "$size" -lt 100000 ]; then
                         echo "Подозрительно маленький бинарник: ${size} байт"
                         exit 1
@@ -82,21 +82,24 @@ pipeline {
 
                     rm -rf AppDir
                     mkdir -p AppDir/usr/bin
-                    cp build/lgremote AppDir/usr/bin/lgremote
-                    chmod +x AppDir/usr/bin/lgremote
+                    cp build/lazytv AppDir/usr/bin/lazytv
+                    chmod +x AppDir/usr/bin/lazytv
 
-                    cat > lgremote.desktop <<'DESKTOP'
+                    cat > lazytv.desktop <<'DESKTOP'
 [Desktop Entry]
 Type=Application
-Name=LgRemote
-Comment=LG NetCast TV remote
-Exec=lgremote
-Icon=lgremote
+Name=LazyTV
+GenericName=TV Remote
+Comment=Control your LG NetCast TV from your computer
+Exec=lazytv
+Icon=lazytv
 Terminal=false
-Categories=Utility;AudioVideo;
+Categories=AudioVideo;
+StartupNotify=true
+StartupWMClass=lazytv
 DESKTOP
 
-                    cp resources/ic_launcher.svg lgremote.svg
+                    cp resources/ic_launcher.svg lazytv.svg
 
                     export EXTRA_QT_MODULES="svg;"
                     export EXTRA_QT_PLUGINS="svg;"
@@ -106,14 +109,14 @@ DESKTOP
                         --appdir AppDir \
                         --plugin qt \
                         --output appimage \
-                        --desktop-file=lgremote.desktop \
-                        --icon-file=lgremote.svg
+                        --desktop-file=lazytv.desktop \
+                        --icon-file=lazytv.svg
 
-                    mv -v LgRemote*.AppImage \
-                          "lgremote-${APP_VERSION}-x86_64.AppImage"
+                    mv -v LazyTV*.AppImage \
+                          "lazytv-${APP_VERSION}-x86_64.AppImage"
 
-                    sha256sum "lgremote-${APP_VERSION}-x86_64.AppImage" \
-                        > "lgremote-${APP_VERSION}-x86_64.AppImage.sha256"
+                    sha256sum "lazytv-${APP_VERSION}-x86_64.AppImage" \
+                        > "lazytv-${APP_VERSION}-x86_64.AppImage.sha256"
 
                     ls -la *.AppImage *.sha256
                 '''
@@ -124,10 +127,10 @@ DESKTOP
             steps {
                 sh '''
                     set -eu
-                    ./lgremote-${APP_VERSION}-x86_64.AppImage --appimage-extract > /dev/null
+                    ./lazytv-${APP_VERSION}-x86_64.AppImage --appimage-extract > /dev/null
                     test -f squashfs-root/AppRun -o -L squashfs-root/AppRun
-                    file squashfs-root/usr/bin/lgremote
-                    readelf -d squashfs-root/usr/bin/lgremote | grep -E "RPATH|RUNPATH" || true
+                    file squashfs-root/usr/bin/lazytv
+                    readelf -d squashfs-root/usr/bin/lazytv | grep -E "RPATH|RUNPATH" || true
                     rm -rf squashfs-root
                 '''
             }
@@ -136,12 +139,12 @@ DESKTOP
 
     post {
         success {
-            archiveArtifacts artifacts: 'lgremote-*.AppImage,lgremote-*.sha256',
+            archiveArtifacts artifacts: 'lazytv-*.AppImage,lazytv-*.sha256',
                              fingerprint: true,
                              onlyIfSuccessful: true
         }
         cleanup {
-            sh 'rm -rf build AppDir lgremote.desktop lgremote.svg'
+            sh 'rm -rf build AppDir lazytv.desktop lazytv.svg'
         }
     }
 }
