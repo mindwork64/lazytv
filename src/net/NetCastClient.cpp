@@ -1,4 +1,4 @@
-#include <lgremote/client.hpp>
+#include <lazytv/client.hpp>
 
 #include <QDateTime>
 #include <QNetworkAccessManager>
@@ -8,7 +8,7 @@
 #include <QUrl>
 #include <QXmlStreamReader>
 
-namespace lgremote {
+namespace lazytv {
 
 Client::Client(QString host, QObject *parent)
     : QObject(parent), m_host(std::move(host)),
@@ -123,4 +123,4 @@ void Client::tryProcessNext() {
   });
 }
 
-} // namespace lgremote
+} // namespace lazytv

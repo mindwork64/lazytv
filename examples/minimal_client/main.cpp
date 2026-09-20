@@ -2,7 +2,7 @@
 #include <QDebug>
 #include <QTimer>
 
-#include <lgremote/client.hpp>
+#include <lazytv/client.hpp>
 
 int main(int argc, char **argv) {
   QCoreApplication app(argc, argv);
@@ -13,15 +13,15 @@ int main(int argc, char **argv) {
   }
 
   const QString ip = QString::fromUtf8(argv[1]);
-  lgremote::Client client(ip);
+  lazytv::Client client(ip);
 
-  QObject::connect(&client, &lgremote::Client::pairingKeyResult, [](bool ok) {
+  QObject::connect(&client, &lazytv::Client::pairingKeyResult, [](bool ok) {
     qInfo() << "Pairing key request:" << (ok ? "OK" : "FAILED");
     if (!ok)
       QCoreApplication::exit(2);
   });
 
-  QObject::connect(&client, &lgremote::Client::pairingConfirmResult,
+  QObject::connect(&client, &lazytv::Client::pairingConfirmResult,
                    [&](const QString &session) {
                      if (session.isEmpty()) {
                        qWarning() << "Pairing rejected";
@@ -31,11 +31,11 @@ int main(int argc, char **argv) {
                      qInfo() << "Paired. Session:" << session;
                      qInfo() << "Sending POWER in 500 ms...";
                      QTimer::singleShot(500, [&] {
-                       client.sendCommand(lgremote::Client::Command::Power);
+                       client.sendCommand(lazytv::Client::Command::Power);
                      });
                    });
 
-  QObject::connect(&client, &lgremote::Client::commandResult, [](bool ok) {
+  QObject::connect(&client, &lazytv::Client::commandResult, [](bool ok) {
     qInfo() << "Command result:" << (ok ? "OK" : "FAILED");
     QCoreApplication::exit(ok ? 0 : 4);
   });

@@ -9,8 +9,8 @@
 #include <QTimer>
 #include <QVBoxLayout>
 
-#include <lgremote/app_container.hpp>
-#include <lgremote/client.hpp>
+#include <lazytv/app_container.hpp>
+#include <lazytv/client.hpp>
 
 #include "theme/Theme.hpp"
 #include "ui/widgets/DPad.hpp"
@@ -18,7 +18,7 @@
 #include "ui/widgets/Keypad.hpp"
 #include "ui/widgets/RockerColumn.hpp"
 
-using Cmd = lgremote::Client::Command;
+using Cmd = lazytv::Client::Command;
 
 namespace {
 
@@ -45,7 +45,7 @@ QWidget *wrapRow(std::initializer_list<QWidget *> widgets, int spacing = 12) {
 
 } // namespace
 
-RemoteScreen::RemoteScreen(lgremote::AppContainer *container, QWidget *parent)
+RemoteScreen::RemoteScreen(lazytv::AppContainer *container, QWidget *parent)
     : QWidget(parent), m_container(container) {
 
   auto *root = new QVBoxLayout(this);
@@ -88,7 +88,6 @@ void RemoteScreen::showEvent(QShowEvent * /*event*/) {
 QWidget *RemoteScreen::buildMainPage() {
   auto *page = new QWidget;
 
-  // Power — круглая кнопка
   auto *power = new IconButton(":/icons/power.svg", "", page);
   power->setLabelVisible(false);
   power->setFixedSize(56, 56);
@@ -101,14 +100,12 @@ QWidget *RemoteScreen::buildMainPage() {
   powerLayout->addWidget(power);
   powerLayout->addStretch();
 
-  // Рокер громкости
   auto *vol = new RockerColumn("VOL", page);
   connect(vol, &RockerColumn::plus, this,
           [this] { sendCommand(Cmd::VolumeUp); });
   connect(vol, &RockerColumn::minus, this,
           [this] { sendCommand(Cmd::VolumeDown); });
 
-  // Home / Exit
   auto *home = new IconButton(":/icons/home.svg", "HOME", page);
   home->setMinimumHeight(72);
   connect(home, &QAbstractButton::clicked, this,
@@ -121,7 +118,6 @@ QWidget *RemoteScreen::buildMainPage() {
 
   auto *homeExitColumn = wrapColumn({home, exitBtn}, 12);
 
-  // Рокер каналов
   auto *ch = new RockerColumn("CH", page);
   connect(ch, &RockerColumn::plus, this,
           [this] { sendCommand(Cmd::ChannelUp); });
@@ -136,7 +132,6 @@ QWidget *RemoteScreen::buildMainPage() {
   topLayout->addWidget(homeExitColumn, 12);
   topLayout->addWidget(ch, 1);
 
-  // Средний ряд
   auto makeBtn = [&](const QString &svg, const QString &lbl,
                      Cmd cmd) -> IconButton * {
     auto *b = new IconButton(svg, lbl, page);
@@ -158,7 +153,6 @@ QWidget *RemoteScreen::buildMainPage() {
 
   auto *midRow = wrapRow({mute, back, kbd, input}, 10);
 
-  // D-Pad
   auto *dpad = new DPad(page);
   connect(dpad, &DPad::up, this, [this] { sendCommand(Cmd::Up); });
   connect(dpad, &DPad::down, this, [this] { sendCommand(Cmd::Down); });
@@ -166,7 +160,6 @@ QWidget *RemoteScreen::buildMainPage() {
   connect(dpad, &DPad::right, this, [this] { sendCommand(Cmd::Right); });
   connect(dpad, &DPad::ok, this, [this] { sendCommand(Cmd::Ok); });
 
-  // INFO
   IconButton *info = makeBtn(":/icons/info.svg", "INFO", Cmd::Info);
   info->setFixedWidth(96);
 
@@ -199,13 +192,13 @@ QWidget *RemoteScreen::buildNumbersPage() {
     const int digit = i + 1;
     auto *key = new KeypadKey(digit, page);
     connect(key, &QAbstractButton::clicked, this,
-            [this, digit] { sendCommand(lgremote::Client::digit(digit)); });
+            [this, digit] { sendCommand(lazytv::Client::digit(digit)); });
     grid->addWidget(key, i / 3, i % 3);
   }
 
   auto *zero = new KeypadKey(0, page);
   connect(zero, &QAbstractButton::clicked, this,
-          [this] { sendCommand(lgremote::Client::digit(0)); });
+          [this] { sendCommand(lazytv::Client::digit(0)); });
   grid->addWidget(zero, 3, 1);
 
   auto *backKey = new KeypadKey(-1, page);
@@ -226,7 +219,7 @@ void RemoteScreen::sendCommand(Cmd cmd) {
     recomputeStatus();
     return;
   }
-  connect(client, &lgremote::Client::commandResult, this,
+  connect(client, &lazytv::Client::commandResult, this,
           &RemoteScreen::onCommandResult, Qt::UniqueConnection);
   client->sendCommand(cmd);
 }

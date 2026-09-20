@@ -3,19 +3,19 @@
 #include <QString>
 #include <optional>
 
-#include <lgremote/lgremote_export.h>
+#include <lazytv/lazytv_export.h>
 
-namespace lgremote {
+namespace lazytv {
 
 /**
  * Постоянное хранилище сессии и настроек.
  *
- * Файл: $XDG_CONFIG_HOME/lgremote/config.json
- * По умолчанию ~/.config/lgremote/config.json
+ * Файл: $XDG_CONFIG_HOME/lazytv/config.json
+ * По умолчанию ~/.config/lazytv/config.json
  *
  * Не потокобезопасен. Рассчитан на использование из GUI-потока.
  */
-class LGREMOTE_EXPORT SessionStore {
+class LAZYTV_EXPORT SessionStore {
 public:
   SessionStore();
 
@@ -45,4 +45,4 @@ private:
   int m_themeMode = 1;
 };
 
-} // namespace lgremote
+} // namespace lazytv

@@ -7,7 +7,7 @@ override_dh_auto_configure:
 	dh_auto_configure -- \
 		-DCMAKE_BUILD_TYPE=Release \
 		-DCMAKE_INSTALL_PREFIX=/usr \
-		-DLGREMOTE_INSTALL_LIB=OFF
+		-DLAZYTV_INSTALL_LIB=OFF
 
 override_dh_auto_test:
 	# Тестов нет

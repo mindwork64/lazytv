@@ -8,12 +8,12 @@
 #include <QRegularExpression>
 #include <QVBoxLayout>
 
-#include <lgremote/app_container.hpp>
-#include <lgremote/client.hpp>
+#include <lazytv/app_container.hpp>
+#include <lazytv/client.hpp>
 
 #include "theme/Theme.hpp"
 
-PairingScreen::PairingScreen(lgremote::AppContainer *container, QWidget *parent)
+PairingScreen::PairingScreen(lazytv::AppContainer *container, QWidget *parent)
     : QWidget(parent), m_container(container) {
 
   auto *root = new QVBoxLayout(this);
@@ -95,7 +95,7 @@ void PairingScreen::requestKey() {
   setLoading(true);
 
   m_activeClient = m_container->createClient(ip);
-  connect(m_activeClient, &lgremote::Client::pairingKeyResult, this,
+  connect(m_activeClient, &lazytv::Client::pairingKeyResult, this,
           [this](bool ok) {
             setLoading(false);
             if (ok)
@@ -123,7 +123,7 @@ void PairingScreen::confirm() {
   setLoading(true);
 
   m_activeClient = m_container->createClient(ip);
-  connect(m_activeClient, &lgremote::Client::pairingConfirmResult, this,
+  connect(m_activeClient, &lazytv::Client::pairingConfirmResult, this,
           [this, ip](const QString &session) {
             setLoading(false);
             if (session.isEmpty()) {

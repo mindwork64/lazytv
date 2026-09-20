@@ -1,7 +1,7 @@
-lgremote (1.1.0+repack2-1) noble; urgency=medium
+lazytv (1.1.0-1) noble; urgency=medium
 
-  * Repack: add LGREMOTE_INSTALL_LIB option.
-  * PPA build: install only the executable and desktop files.
-  * Drop debian/lgremote.install (no longer needed).
+  * Initial release under the LazyTV name.
+  * Renamed from lgremote to avoid trademark ambiguity.
+  * No functional changes — same application, same features.
 
- -- mindwork64 <vmurashov85@gmail.com>  Sun, 20 Sep 2026 14:50:00 +0300
+ -- mindwork64 <vmurashov85@gmail.com>  Sun, 20 Sep 2026 16:00:00 +0300

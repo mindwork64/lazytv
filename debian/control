@@ -1,4 +1,4 @@
-Source: lgremote
+Source: lazytv
 Section: utils
 Priority: optional
 Maintainer: mindwork64 <vmurashov85@gmail.com>
@@ -10,20 +10,20 @@ Build-Depends:
  libgl-dev,
  pkgconf
 Standards-Version: 4.6.2
-Homepage: https://github.com/mindwork64/lgremote-qt
-Vcs-Git: https://github.com/mindwork64/lgremote-qt.git
-Vcs-Browser: https://github.com/mindwork64/lgremote-qt
+Homepage: https://github.com/mindwork64/lazytv
+Vcs-Git: https://github.com/mindwork64/lazytv.git
+Vcs-Browser: https://github.com/mindwork64/lazytv
 Rules-Requires-Root: no
 
-Package: lgremote
+Package: lazytv
 Architecture: any
 Depends:
  ${shlibs:Depends},
  ${misc:Depends}
 Description: Remote control for LG NetCast televisions
- LG Лентяйка — a desktop application that turns a Linux computer
- into a full-featured remote control for LG televisions supporting
- the NetCast protocol (mostly 2010-2014 models).
+ LazyTV is a desktop application that turns a Linux computer into a
+ full-featured remote control for LG televisions supporting the
+ NetCast protocol (mostly 2010-2014 models).
  .
  Features include power control, volume and channel rockers with
  auto-repeat, D-Pad navigation, numeric keypad, source selection,

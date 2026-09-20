@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
 # Запускается один раз на Jenkins-агенте с sudo.
-# Скачивает linuxdeploy-инструменты как AppImage и создаёт wrapper-скрипты.
+# Ставит apt-пакеты, скачивает linuxdeploy-AppImage'ы и создаёт wrapper'ы в /usr/local/bin.
 
 set -euo pipefail
 
-TOOLS_DIR="${TOOLS_DIR:-/opt/lgremote-build-tools}"
+TOOLS_DIR="${TOOLS_DIR:-/opt/lazytv-build-tools}"
 
 echo "=== apt packages ==="
 sudo apt-get update
@@ -43,15 +43,14 @@ fetch_appimage \
     "https://github.com/linuxdeploy/linuxdeploy-plugin-qt/releases/download/continuous/linuxdeploy-plugin-qt-x86_64.AppImage" \
     "linuxdeploy-plugin-qt"
 
-# Создаём wrapper-скрипты в /usr/local/bin, которые прозрачно
-# запускают AppImage с APPIMAGE_EXTRACT_AND_RUN=1
 echo "=== создаём wrapper-скрипты ==="
 
 for tool in linuxdeploy linuxdeploy-plugin-qt; do
     wrapper="/usr/local/bin/${tool}"
     sudo tee "$wrapper" > /dev/null <<EOF
 #!/bin/sh
-exec env APPIMAGE_EXTRACT_AND_RUN=1 ${TOOLS_DIR}/${tool}.AppImage "\$@"
+exec env APPIMAGE_EXTRACT_AND_RUN=1 TMPDIR="\${TMPDIR:-/var/tmp}" \\
+    ${TOOLS_DIR}/${tool}.AppImage "\$@"
 EOF
     sudo chmod +x "$wrapper"
     echo "  -> $wrapper"
