@@ -7,7 +7,6 @@
 2010–2014 годов, а также часть более новых с включённым режимом совместимости).
 Работает по локальной сети, без облаков, без регистрации, без сбора данных.
 
-![Скриншот главного экрана](docs/screenshot-main.png)
 
 ---
 
@@ -44,7 +43,6 @@
 Всё. Дальше приложение запомнит сессию, и при следующем запуске сразу откроет
 пульт — вводить код заново не нужно.
 
-![Экран сопряжения](docs/screenshot-pairing.png)
 
 ---
 
@@ -67,7 +65,6 @@
 PIN-кодов в родительском контроле, поиска в YouTube, ввода паролей от
 приложений Smart TV.
 
-![Цифровая клавиатура](docs/screenshot-keypad.png)
 
 ### Настройки
 
@@ -76,7 +73,6 @@ PIN-кодов в родительском контроле, поиска в You
 - **Три темы оформления**: тёмная, светлая, системная
 - Информация о версии
 
-![Настройки](docs/screenshot-settings.png)
 
 ### Индикатор состояния
 
@@ -103,13 +99,36 @@ Qt-приложений и не создаёт проблем.
 
 ## Установка
 
-### Вариант 1 — AppImage (самый простой)
+### Вариант 1 — PPA (только Ubuntu)
 
-Скачайте `lgremote-1.0.0-x86_64.AppImage` со страницы последнего релиза.
+Самый удобный способ для Ubuntu 24.04 (noble). Автоматические обновления
+приходят вместе с системными.
 
 ```bash
-chmod +x lgremote-1.0.0-x86_64.AppImage
-./lgremote-1.0.0-x86_64.AppImage
+sudo add-apt-repository ppa:mindwork64/lgremote
+sudo apt update
+sudo apt install lgremote
+```
+
+Запуск:
+
+```bash
+lgremote
+```
+
+Или через меню приложений — там появится **LgRemote** с иконкой.
+
+**Для более старых версий Ubuntu** (22.04 и старше) — используйте AppImage
+или сборку из исходников, так как PPA собирается только для `noble`.
+
+### Вариант 2 — AppImage (самый универсальный)
+
+Скачайте `lgremote-1.1.0-x86_64.AppImage` со страницы
+[последнего релиза](https://github.com/mindwork64/lgremote-qt/releases/latest).
+
+```bash
+chmod +x lgremote-1.1.0-x86_64.AppImage
+./lgremote-1.1.0-x86_64.AppImage
 ```
 
 Никаких зависимостей устанавливать не нужно — Qt и все библиотеки упакованы
@@ -127,10 +146,10 @@ sudo apt install libfuse2         # Ubuntu 22.04 и старше
 Или запустите без FUSE (медленнее стартует, но работает):
 
 ```bash
-./lgremote-1.0.0-x86_64.AppImage --appimage-extract-and-run
+./lgremote-1.1.0-x86_64.AppImage --appimage-extract-and-run
 ```
 
-### Вариант 2 — из исходников
+### Вариант 3 — из исходников
 
 ```bash
 git clone https://github.com/mindwork64/lgremote-qt.git
@@ -229,6 +248,17 @@ rm -rf ~/.config/lgremote
   официальные.
 - Если сетевое соединение слабое (далеко от роутера, толстые стены) —
   задержка может быть больше. Попробуйте приблизиться к роутеру.
+
+### Иконка не появилась в меню (после установки из PPA)
+
+Обновите кэш приложений и иконок:
+
+```bash
+sudo update-desktop-database
+sudo gtk-update-icon-cache /usr/share/icons/hicolor
+```
+
+После этого перезайдите в сессию (или перезагрузитесь).
 
 ---
 
@@ -343,6 +373,57 @@ target_link_libraries(my_remote PRIVATE LgRemote::Core)
 Полный пример — в [`examples/minimal_client/`](examples/minimal_client/).
 Он собирается отдельно против установленной библиотеки и не требует
 всего дерева исходников.
+
+---
+
+## Сборка PPA-пакета (для разработчиков)
+
+Если хотите собрать `.deb` самостоятельно:
+
+```bash
+# Создать рабочую копию с правильным именем папки
+cd ~/apps
+mkdir -p lgremote-1.1.0+repack2
+cd lgremote-qt
+git archive --format=tar --prefix=lgremote-1.1.0+repack2/ HEAD \
+    | tar -x -C ~/apps/
+
+# Orig-архив без debian/
+cd ~/apps
+tar -czf lgremote_1.1.0+repack2.orig.tar.gz \
+    --exclude='lgremote-1.1.0+repack2/debian' \
+    lgremote-1.1.0+repack2/
+
+# Source-пакет
+cd ~/apps/lgremote-1.1.0+repack2
+chmod +x debian/rules
+rm -f debian/files
+debuild -S -sa -k<ваш-GPG-key-id>
+
+# Проверка и загрузка
+cd ~/apps
+lintian lgremote_1.1.0+repack2-1_source.changes
+dput lgremote lgremote_1.1.0+repack2-1_source.changes
+```
+
+Структура `debian/`:
+
+- `changelog` — история версий
+- `control` — метаданные и зависимости сборки
+- `copyright` — лицензия
+- `rules` — скрипт сборки (передаёт `-DLGREMOTE_INSTALL_LIB=OFF`)
+- `source/format` — формат `3.0 (quilt)`
+- `watch` — проверка новых версий через uscan
+
+---
+
+## CI / Автоматическая сборка
+
+**Jenkins** — сборка AppImage по каждому пушу. Пайплайн в `Jenkinsfile`,
+подготовка агента — в `jenkins/setup-agent.sh`.
+
+**Launchpad PPA** — автоматическая сборка `.deb` при загрузке source-пакета.
+[Подробнее](https://launchpad.net/~mindwork64/+archive/ubuntu/lgremote).
 
 ---
 
