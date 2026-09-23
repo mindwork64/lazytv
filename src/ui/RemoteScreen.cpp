@@ -96,8 +96,12 @@ void RemoteScreen::showEvent(QShowEvent* /*event*/) {
     }
     m_statusBar->setIp(m_container->store().ip().value_or(QString()));
 
-    // Перепроверяем доступность сразу при показе экрана,
-    // не дожидаясь следующего тика m_reachabilityTimer.
+    // Прогреваем HTTP-соединение, чтобы первая команда ушла без задержки.
+    // Если клиент ещё не создан — getClient() создаст его с сохранённой сессией.
+    if (auto* client = m_container->getClient()) {
+        client->warmUp();
+    }
+
     QTimer::singleShot(0, this, &RemoteScreen::checkReachability);
 }
 
