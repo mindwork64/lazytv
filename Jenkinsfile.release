@@ -131,7 +131,7 @@ pipeline {
                     chmod +x AppDir/usr/bin/lazytv
 
                     cp lazytv.desktop AppDir/
-                    cp resources/ic_launcher.svg AppDir/lazytv.svg
+                    cp resources/ic_launcher.svg lazytv.svg
 
                     export EXTRA_QT_MODULES="svg;"
                     export EXTRA_QT_PLUGINS="svg;"
