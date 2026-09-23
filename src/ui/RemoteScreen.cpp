@@ -6,6 +6,7 @@
 #include <QLabel>
 #include <QShowEvent>
 #include <QStackedWidget>
+#include <QTcpSocket>
 #include <QTimer>
 #include <QVBoxLayout>
 
@@ -22,242 +23,314 @@ using Cmd = lazytv::Client::Command;
 
 namespace {
 
-QWidget *wrapColumn(std::initializer_list<QWidget *> widgets,
-                    int spacing = 14) {
-  auto *w = new QWidget;
-  auto *l = new QVBoxLayout(w);
-  l->setContentsMargins(0, 0, 0, 0);
-  l->setSpacing(spacing);
-  for (auto *c : widgets)
-    l->addWidget(c);
-  return w;
+constexpr int kReachabilityIntervalMs = 30'000;   // 30 секунд
+constexpr int kReachabilityTimeoutMs  = 2'000;    // 2 секунды на probe
+
+QWidget* wrapColumn(std::initializer_list<QWidget*> widgets, int spacing = 14) {
+    auto* w = new QWidget;
+    auto* l = new QVBoxLayout(w);
+    l->setContentsMargins(0, 0, 0, 0);
+    l->setSpacing(spacing);
+    for (auto* c : widgets) l->addWidget(c);
+    return w;
 }
 
-QWidget *wrapRow(std::initializer_list<QWidget *> widgets, int spacing = 12) {
-  auto *w = new QWidget;
-  auto *l = new QHBoxLayout(w);
-  l->setContentsMargins(0, 0, 0, 0);
-  l->setSpacing(spacing);
-  for (auto *c : widgets)
-    l->addWidget(c);
-  return w;
+QWidget* wrapRow(std::initializer_list<QWidget*> widgets, int spacing = 12) {
+    auto* w = new QWidget;
+    auto* l = new QHBoxLayout(w);
+    l->setContentsMargins(0, 0, 0, 0);
+    l->setSpacing(spacing);
+    for (auto* c : widgets) l->addWidget(c);
+    return w;
 }
 
 } // namespace
 
-RemoteScreen::RemoteScreen(lazytv::AppContainer *container, QWidget *parent)
+RemoteScreen::RemoteScreen(lazytv::AppContainer* container, QWidget* parent)
     : QWidget(parent), m_container(container) {
 
-  auto *root = new QVBoxLayout(this);
-  root->setContentsMargins(20, 12, 20, 12);
-  root->setSpacing(14);
+    auto* root = new QVBoxLayout(this);
+    root->setContentsMargins(20, 12, 20, 12);
+    root->setSpacing(14);
 
-  m_statusBar = new StatusBar(this);
-  connect(m_statusBar, &StatusBar::settingsClicked, this,
-          &RemoteScreen::openSettings);
-  root->addWidget(m_statusBar);
+    m_statusBar = new StatusBar(this);
+    connect(m_statusBar, &StatusBar::settingsClicked,
+            this, &RemoteScreen::openSettings);
+    root->addWidget(m_statusBar);
 
-  m_pages = new QStackedWidget(this);
-  m_pages->addWidget(buildMainPage());
-  m_pages->addWidget(buildNumbersPage());
-  root->addWidget(m_pages, 1);
+    m_pages = new QStackedWidget(this);
+    m_pages->addWidget(buildMainPage());
+    m_pages->addWidget(buildNumbersPage());
+    root->addWidget(m_pages, 1);
 
-  m_errorBanner = new QLabel(this);
-  m_errorBanner->setWordWrap(true);
-  m_errorBanner->setVisible(false);
-  root->addWidget(m_errorBanner);
+    m_errorBanner = new QLabel(this);
+    m_errorBanner->setWordWrap(true);
+    m_errorBanner->setVisible(false);
+    root->addWidget(m_errorBanner);
 
-  m_statusTimer = new QTimer(this);
-  m_statusTimer->setInterval(5000);
-  connect(m_statusTimer, &QTimer::timeout, this,
-          &RemoteScreen::recomputeStatus);
-  m_statusTimer->start();
+    // Пересчёт отображаемого статуса раз в 5 секунд — на случай,
+    // что с момента последней команды прошло много времени.
+    m_statusTimer = new QTimer(this);
+    m_statusTimer->setInterval(5'000);
+    connect(m_statusTimer, &QTimer::timeout,
+            this, &RemoteScreen::recomputeStatus);
+    m_statusTimer->start();
 
-  connect(&ThemeManager::instance(), &ThemeManager::changed, this, [this]() {
-    m_statusBar->update();
-    updateErrorBannerStyle();
-  });
+    // Проверка доступности ТВ через TCP-probe раз в 30 секунд.
+    m_reachabilityTimer = new QTimer(this);
+    m_reachabilityTimer->setInterval(kReachabilityIntervalMs);
+    connect(m_reachabilityTimer, &QTimer::timeout,
+            this, &RemoteScreen::checkReachability);
+    m_reachabilityTimer->start();
+
+    connect(&ThemeManager::instance(), &ThemeManager::changed, this, [this]() {
+        m_statusBar->update();
+        updateErrorBannerStyle();
+    });
 }
 
-void RemoteScreen::showEvent(QShowEvent * /*event*/) {
-  if (!m_container->store().session())
-    emit disconnected();
-  m_statusBar->setIp(m_container->store().ip().value_or(QString()));
+void RemoteScreen::showEvent(QShowEvent* /*event*/) {
+    if (!m_container->store().session()) {
+        emit disconnected();
+        return;
+    }
+    m_statusBar->setIp(m_container->store().ip().value_or(QString()));
+
+    // Перепроверяем доступность сразу при показе экрана,
+    // не дожидаясь следующего тика m_reachabilityTimer.
+    QTimer::singleShot(0, this, &RemoteScreen::checkReachability);
 }
 
-QWidget *RemoteScreen::buildMainPage() {
-  auto *page = new QWidget;
+void RemoteScreen::checkReachability() {
+    const QString ip = m_container->store().ip().value_or(QString());
+    if (ip.isEmpty()) {
+        m_reachable = false;
+        recomputeStatus();
+        return;
+    }
 
-  auto *power = new IconButton(":/icons/power.svg", "", page);
-  power->setLabelVisible(false);
-  power->setFixedSize(56, 56);
-  connect(power, &QAbstractButton::clicked, this,
-          [this] { sendCommand(Cmd::Power); });
+    // Отменяем предыдущий probe, если он ещё висит.
+    if (m_probeSocket) {
+        m_probeSocket->abort();
+        m_probeSocket->deleteLater();
+        m_probeSocket.clear();
+    }
 
-  auto *powerWrap = new QWidget;
-  auto *powerLayout = new QHBoxLayout(powerWrap);
-  powerLayout->setContentsMargins(0, 0, 0, 0);
-  powerLayout->addWidget(power);
-  powerLayout->addStretch();
+    auto* socket = new QTcpSocket(this);
+    m_probeSocket = socket;
 
-  auto *vol = new RockerColumn("VOL", page);
-  connect(vol, &RockerColumn::plus, this,
-          [this] { sendCommand(Cmd::VolumeUp); });
-  connect(vol, &RockerColumn::minus, this,
-          [this] { sendCommand(Cmd::VolumeDown); });
+    auto finish = [this, socket](bool ok) {
+        if (socket) {
+            socket->abort();
+            socket->deleteLater();
+        }
+        if (m_probeSocket == socket) {
+            m_probeSocket.clear();
+        }
+        m_reachable = ok;
+        recomputeStatus();
+    };
 
-  auto *home = new IconButton(":/icons/home.svg", "HOME", page);
-  home->setMinimumHeight(72);
-  connect(home, &QAbstractButton::clicked, this,
-          [this] { sendCommand(Cmd::HomeMenu); });
+    connect(socket, &QTcpSocket::connected, this, [finish]() mutable {
+        finish(true);
+    });
 
-  auto *exitBtn = new IconButton(":/icons/exit.svg", "EXIT", page);
-  exitBtn->setMinimumHeight(72);
-  connect(exitBtn, &QAbstractButton::clicked, this,
-          [this] { sendCommand(Cmd::Exit); });
+    connect(socket, &QTcpSocket::errorOccurred, this,
+            [finish](QAbstractSocket::SocketError) mutable {
+        finish(false);
+    });
 
-  auto *homeExitColumn = wrapColumn({home, exitBtn}, 12);
+    // Страховка на случай, если ни connected, ни errorOccurred не сработают
+    // (например, из-за потери пакетов).
+    QTimer::singleShot(kReachabilityTimeoutMs, socket, [this, socket]() {
+        if (!socket) return;
+        if (socket->state() != QAbstractSocket::ConnectedState) {
+            socket->abort();
+            socket->deleteLater();
+            if (m_probeSocket == socket) {
+                m_probeSocket.clear();
+            }
+            m_reachable = false;
+            recomputeStatus();
+        }
+    });
 
-  auto *ch = new RockerColumn("CH", page);
-  connect(ch, &RockerColumn::plus, this,
-          [this] { sendCommand(Cmd::ChannelUp); });
-  connect(ch, &RockerColumn::minus, this,
-          [this] { sendCommand(Cmd::ChannelDown); });
-
-  auto *topRow = new QWidget;
-  auto *topLayout = new QHBoxLayout(topRow);
-  topLayout->setContentsMargins(0, 0, 0, 0);
-  topLayout->setSpacing(12);
-  topLayout->addWidget(vol, 1);
-  topLayout->addWidget(homeExitColumn, 12);
-  topLayout->addWidget(ch, 1);
-
-  auto makeBtn = [&](const QString &svg, const QString &lbl,
-                     Cmd cmd) -> IconButton * {
-    auto *b = new IconButton(svg, lbl, page);
-    b->setMinimumHeight(72);
-    connect(b, &QAbstractButton::clicked, this,
-            [this, cmd] { sendCommand(cmd); });
-    return b;
-  };
-
-  IconButton *mute = makeBtn(":/icons/mute.svg", "MUTE", Cmd::MuteToggle);
-  IconButton *back = makeBtn(":/icons/back.svg", "BACK", Cmd::Back);
-
-  IconButton *kbd = new IconButton(":/icons/kbd.svg", "KBD", page);
-  kbd->setMinimumHeight(72);
-  connect(kbd, &QAbstractButton::clicked, this,
-          [this] { m_pages->setCurrentIndex(1); });
-
-  IconButton *input = makeBtn(":/icons/input.svg", "INPUT", Cmd::ExternalInput);
-
-  auto *midRow = wrapRow({mute, back, kbd, input}, 10);
-
-  auto *dpad = new DPad(page);
-  connect(dpad, &DPad::up, this, [this] { sendCommand(Cmd::Up); });
-  connect(dpad, &DPad::down, this, [this] { sendCommand(Cmd::Down); });
-  connect(dpad, &DPad::left, this, [this] { sendCommand(Cmd::Left); });
-  connect(dpad, &DPad::right, this, [this] { sendCommand(Cmd::Right); });
-  connect(dpad, &DPad::ok, this, [this] { sendCommand(Cmd::Ok); });
-
-  IconButton *info = makeBtn(":/icons/info.svg", "INFO", Cmd::Info);
-  info->setFixedWidth(96);
-
-  auto *infoWrap = new QWidget;
-  auto *infoLayout = new QHBoxLayout(infoWrap);
-  infoLayout->setContentsMargins(0, 0, 0, 0);
-  infoLayout->addStretch();
-  infoLayout->addWidget(info);
-  infoLayout->addStretch();
-
-  auto *layout = new QVBoxLayout(page);
-  layout->setContentsMargins(0, 0, 0, 0);
-  layout->setSpacing(14);
-  layout->addWidget(powerWrap);
-  layout->addWidget(topRow);
-  layout->addWidget(midRow);
-  layout->addWidget(dpad, 1, Qt::AlignHCenter);
-  layout->addWidget(infoWrap);
-
-  return page;
+    socket->connectToHost(ip, lazytv::Client::kPort);
 }
 
-QWidget *RemoteScreen::buildNumbersPage() {
-  auto *page = new QWidget;
-  auto *grid = new QGridLayout(page);
-  grid->setContentsMargins(4, 0, 4, 0);
-  grid->setSpacing(16);
+QWidget* RemoteScreen::buildMainPage() {
+    auto* page = new QWidget;
 
-  for (int i = 0; i < 9; ++i) {
-    const int digit = i + 1;
-    auto *key = new KeypadKey(digit, page);
-    connect(key, &QAbstractButton::clicked, this,
-            [this, digit] { sendCommand(lazytv::Client::digit(digit)); });
-    grid->addWidget(key, i / 3, i % 3);
-  }
+    auto* power = new IconButton(":/icons/power.svg", "", page);
+    power->setLabelVisible(false);
+    power->setFixedSize(56, 56);
+    connect(power, &QAbstractButton::clicked, this,
+            [this] { sendCommand(Cmd::Power); });
 
-  auto *zero = new KeypadKey(0, page);
-  connect(zero, &QAbstractButton::clicked, this,
-          [this] { sendCommand(lazytv::Client::digit(0)); });
-  grid->addWidget(zero, 3, 1);
+    auto* powerWrap = new QWidget;
+    auto* powerLayout = new QHBoxLayout(powerWrap);
+    powerLayout->setContentsMargins(0, 0, 0, 0);
+    powerLayout->addWidget(power);
+    powerLayout->addStretch();
 
-  auto *backKey = new KeypadKey(-1, page);
-  connect(backKey, &QAbstractButton::clicked, this,
-          [this] { m_pages->setCurrentIndex(0); });
-  grid->addWidget(backKey, 3, 2);
+    auto* vol = new RockerColumn("VOL", page);
+    connect(vol, &RockerColumn::plus,  this, [this] { sendCommand(Cmd::VolumeUp);   });
+    connect(vol, &RockerColumn::minus, this, [this] { sendCommand(Cmd::VolumeDown); });
 
-  return page;
+    auto* home = new IconButton(":/icons/home.svg", "HOME", page);
+    home->setMinimumHeight(72);
+    connect(home, &QAbstractButton::clicked, this,
+            [this] { sendCommand(Cmd::HomeMenu); });
+
+    auto* exitBtn = new IconButton(":/icons/exit.svg", "EXIT", page);
+    exitBtn->setMinimumHeight(72);
+    connect(exitBtn, &QAbstractButton::clicked, this,
+            [this] { sendCommand(Cmd::Exit); });
+
+    auto* homeExitColumn = wrapColumn({home, exitBtn}, 12);
+
+    auto* ch = new RockerColumn("CH", page);
+    connect(ch, &RockerColumn::plus,  this, [this] { sendCommand(Cmd::ChannelUp);   });
+    connect(ch, &RockerColumn::minus, this, [this] { sendCommand(Cmd::ChannelDown); });
+
+    auto* topRow = new QWidget;
+    auto* topLayout = new QHBoxLayout(topRow);
+    topLayout->setContentsMargins(0, 0, 0, 0);
+    topLayout->setSpacing(12);
+    topLayout->addWidget(vol, 1);
+    topLayout->addWidget(homeExitColumn, 12);
+    topLayout->addWidget(ch, 1);
+
+    auto makeBtn = [&](const QString& svg, const QString& lbl, Cmd cmd) -> IconButton* {
+        auto* b = new IconButton(svg, lbl, page);
+        b->setMinimumHeight(72);
+        connect(b, &QAbstractButton::clicked, this,
+                [this, cmd] { sendCommand(cmd); });
+        return b;
+    };
+
+    IconButton* mute  = makeBtn(":/icons/mute.svg",  "MUTE",  Cmd::MuteToggle);
+    IconButton* back  = makeBtn(":/icons/back.svg",  "BACK",  Cmd::Back);
+
+    IconButton* kbd = new IconButton(":/icons/kbd.svg", "KBD", page);
+    kbd->setMinimumHeight(72);
+    connect(kbd, &QAbstractButton::clicked, this,
+            [this] { m_pages->setCurrentIndex(1); });
+
+    IconButton* input = makeBtn(":/icons/input.svg", "INPUT", Cmd::ExternalInput);
+
+    auto* midRow = wrapRow({mute, back, kbd, input}, 10);
+
+    auto* dpad = new DPad(page);
+    connect(dpad, &DPad::up,    this, [this] { sendCommand(Cmd::Up);    });
+    connect(dpad, &DPad::down,  this, [this] { sendCommand(Cmd::Down);  });
+    connect(dpad, &DPad::left,  this, [this] { sendCommand(Cmd::Left);  });
+    connect(dpad, &DPad::right, this, [this] { sendCommand(Cmd::Right); });
+    connect(dpad, &DPad::ok,    this, [this] { sendCommand(Cmd::Ok);    });
+
+    IconButton* info = makeBtn(":/icons/info.svg", "INFO", Cmd::Info);
+    info->setFixedWidth(96);
+
+    auto* infoWrap = new QWidget;
+    auto* infoLayout = new QHBoxLayout(infoWrap);
+    infoLayout->setContentsMargins(0, 0, 0, 0);
+    infoLayout->addStretch();
+    infoLayout->addWidget(info);
+    infoLayout->addStretch();
+
+    auto* layout = new QVBoxLayout(page);
+    layout->setContentsMargins(0, 0, 0, 0);
+    layout->setSpacing(14);
+    layout->addWidget(powerWrap);
+    layout->addWidget(topRow);
+    layout->addWidget(midRow);
+    layout->addWidget(dpad, 1, Qt::AlignHCenter);
+    layout->addWidget(infoWrap);
+
+    return page;
+}
+
+QWidget* RemoteScreen::buildNumbersPage() {
+    auto* page = new QWidget;
+    auto* grid = new QGridLayout(page);
+    grid->setContentsMargins(4, 0, 4, 0);
+    grid->setSpacing(16);
+
+    for (int i = 0; i < 9; ++i) {
+        const int digit = i + 1;
+        auto* key = new KeypadKey(digit, page);
+        connect(key, &QAbstractButton::clicked, this,
+                [this, digit] { sendCommand(lazytv::Client::digit(digit)); });
+        grid->addWidget(key, i / 3, i % 3);
+    }
+
+    auto* zero = new KeypadKey(0, page);
+    connect(zero, &QAbstractButton::clicked, this,
+            [this] { sendCommand(lazytv::Client::digit(0)); });
+    grid->addWidget(zero, 3, 1);
+
+    auto* backKey = new KeypadKey(-1, page);
+    connect(backKey, &QAbstractButton::clicked, this,
+            [this] { m_pages->setCurrentIndex(0); });
+    grid->addWidget(backKey, 3, 2);
+
+    return page;
 }
 
 void RemoteScreen::sendCommand(Cmd cmd) {
-  auto *client = m_container->getClient();
-  if (!client) {
-    m_lastAttemptFailed = true;
-    m_errorBanner->setText("Сессия не установлена");
-    updateErrorBannerStyle();
-    m_errorBanner->setVisible(true);
-    recomputeStatus();
-    return;
-  }
-  connect(client, &lazytv::Client::commandResult, this,
-          &RemoteScreen::onCommandResult, Qt::UniqueConnection);
-  client->sendCommand(cmd);
+    auto* client = m_container->getClient();
+    if (!client) {
+        m_lastAttemptFailed = true;
+        m_errorBanner->setText("Сессия не установлена");
+        updateErrorBannerStyle();
+        m_errorBanner->setVisible(true);
+        recomputeStatus();
+        return;
+    }
+    connect(client, &lazytv::Client::commandResult,
+            this, &RemoteScreen::onCommandResult, Qt::UniqueConnection);
+    client->sendCommand(cmd);
 }
 
 void RemoteScreen::onCommandResult(bool ok) {
-  if (ok) {
-    m_lastSuccessAt = QDateTime::currentMSecsSinceEpoch();
-    m_lastAttemptFailed = false;
-    m_errorBanner->setVisible(false);
-  } else {
-    m_lastAttemptFailed = true;
-    m_errorBanner->setText("Телевизор не принял команду");
-    updateErrorBannerStyle();
-    m_errorBanner->setVisible(true);
-  }
-  recomputeStatus();
+    if (ok) {
+        m_lastSuccessAt = QDateTime::currentMSecsSinceEpoch();
+        m_lastAttemptFailed = false;
+        // Успешная команда подтверждает, что ТВ точно доступен.
+        m_reachable = true;
+        m_errorBanner->setVisible(false);
+    } else {
+        m_lastAttemptFailed = true;
+        m_errorBanner->setText("Телевизор не принял команду");
+        updateErrorBannerStyle();
+        m_errorBanner->setVisible(true);
+    }
+    recomputeStatus();
 }
 
 void RemoteScreen::recomputeStatus() {
-  const qint64 now = QDateTime::currentMSecsSinceEpoch();
-  ConnectionStatus s;
-  if (m_lastAttemptFailed) {
-    s = ConnectionStatus::Offline;
-  } else if (m_lastSuccessAt > 0 && now - m_lastSuccessAt < 60'000) {
-    s = ConnectionStatus::Online;
-  } else {
-    s = ConnectionStatus::Stale;
-  }
-  m_status = s;
-  m_statusBar->setStatus(s);
+    const qint64 now = QDateTime::currentMSecsSinceEpoch();
+
+    ConnectionStatus s;
+    if (m_lastAttemptFailed) {
+        s = ConnectionStatus::Offline;
+    } else if (m_lastSuccessAt > 0 && now - m_lastSuccessAt < 60'000) {
+        s = ConnectionStatus::Online;
+    } else if (m_reachable.has_value() && !m_reachable.value()) {
+        s = ConnectionStatus::Offline;
+    } else {
+        s = ConnectionStatus::Stale;
+    }
+
+    m_status = s;
+    m_statusBar->setStatus(s);
 }
 
 void RemoteScreen::updateErrorBannerStyle() {
-  if (!m_errorBanner)
-    return;
-  const auto &p = ThemeManager::instance().palette();
-  m_errorBanner->setStyleSheet(
-      QStringLiteral("QLabel { background-color: %1; color: %2; "
-                     "border-radius: 10px; padding: 10px; }")
-          .arg(p.errorContainer.name(), p.onErrorContainer.name()));
+    if (!m_errorBanner) return;
+    const auto& p = ThemeManager::instance().palette();
+    m_errorBanner->setStyleSheet(
+        QStringLiteral("QLabel { background-color: %1; color: %2; "
+                       "border-radius: 10px; padding: 10px; }")
+            .arg(p.errorContainer.name(), p.onErrorContainer.name()));
 }
