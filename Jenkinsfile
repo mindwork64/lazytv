@@ -21,8 +21,6 @@ pipeline {
 
     stages {
         stage('Checkout') {
-            // Собираем только main — всё остальное игнорируем.
-            when { branch 'main' }
             steps {
                 checkout scm
                 sh 'git rev-parse --short HEAD > .git-sha'
@@ -30,7 +28,6 @@ pipeline {
         }
 
         stage('Verify env') {
-            when { branch 'main' }
             steps {
                 sh '''
                     set -eu
@@ -50,7 +47,6 @@ pipeline {
         }
 
         stage('Configure') {
-            when { branch 'main' }
             steps {
                 sh '''
                     set -eu
@@ -64,7 +60,6 @@ pipeline {
         }
 
         stage('Build') {
-            when { branch 'main' }
             steps {
                 sh '''
                     set -eu
@@ -88,7 +83,6 @@ pipeline {
         }
 
         stage('Smoke test') {
-            when { branch 'main' }
             steps {
                 sh '''
                     set -eu
@@ -108,7 +102,6 @@ pipeline {
 
     post {
         success {
-            when { branch 'main' }
             archiveArtifacts artifacts: 'build/lazytv',
                              fingerprint: true,
                              onlyIfSuccessful: true
