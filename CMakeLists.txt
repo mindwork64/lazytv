@@ -89,6 +89,11 @@ target_link_libraries(lazytv-app PRIVATE
 
 set_target_properties(lazytv-app PROPERTIES OUTPUT_NAME lazytv)
 
+# Прокидываем версию из CMake в код — доступна как LAZYTV_VERSION
+target_compile_definitions(lazytv-app PRIVATE
+    LAZYTV_VERSION="${PROJECT_VERSION}"
+)
+
 # =====================================================================
 # Установка библиотеки (опционально)
 # =====================================================================

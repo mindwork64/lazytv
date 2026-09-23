@@ -1,0 +1,182 @@
+pipeline {
+    agent any
+
+    options {
+        timestamps()
+        ansiColor('xterm')
+        disableConcurrentBuilds()
+    }
+
+    parameters {
+        string(
+            name: 'VERSION',
+            defaultValue: '',
+            description: 'Версия (например 1.1.1). Должна совпадать с CMakeLists.txt и debian/changelog.'
+        )
+        string(
+            name: 'GIT_REF',
+            defaultValue: 'main',
+            description: 'Ветка или тег для сборки.'
+        )
+    }
+
+    environment {
+        QT_PREFIX  = '/usr/lib/x86_64-linux-gnu/cmake'
+        BUILD_TYPE = 'Release'
+        VERSION    = "${params.VERSION}"
+        GIT_REF    = "${params.GIT_REF}"
+    }
+
+    stages {
+        stage('Validate') {
+            steps {
+                script {
+                    if (!params.VERSION?.trim()) {
+                        error('VERSION не указан')
+                    }
+                    if (!(params.VERSION ==~ /^\d+\.\d+\.\d+$/)) {
+                        error("VERSION должен быть в формате X.Y.Z, получено: ${params.VERSION}")
+                    }
+                }
+            }
+        }
+
+        stage('Checkout') {
+            steps {
+                checkout scm
+                sh '''
+                    set -eu
+                    git fetch --tags --force
+                    git checkout "${GIT_REF}"
+                    git rev-parse --short HEAD > .git-sha
+                    echo "Building ref: ${GIT_REF}"
+                    echo "Commit:       $(cat .git-sha)"
+                '''
+            }
+        }
+
+        stage('Verify version in sources') {
+            steps {
+                sh '''
+                    set -eu
+
+                    CMakeVer=$(grep -oP 'project\\(lazytv VERSION \\K[0-9.]+' CMakeLists.txt)
+                    ChangelogVer=$(head -1 debian/changelog | grep -oP 'lazytv \\(\\K[0-9.]+')
+
+                    echo "CMakeLists.txt:   $CMakeVer"
+                    echo "debian/changelog: $ChangelogVer"
+                    echo "Parameter:        ${VERSION}"
+
+                    if [ "$CMakeVer" != "${VERSION}" ]; then
+                        echo "CMakeLists.txt содержит версию $CMakeVer, ожидается ${VERSION}"
+                        exit 1
+                    fi
+                    if [ "$ChangelogVer" != "${VERSION}" ]; then
+                        echo "debian/changelog содержит версию $ChangelogVer, ожидается ${VERSION}"
+                        exit 1
+                    fi
+                '''
+            }
+        }
+
+        stage('Configure') {
+            steps {
+                sh '''
+                    set -eu
+                    rm -rf build
+                    cmake -B build -S . -DCMAKE_BUILD_TYPE=${BUILD_TYPE} \
+                        -DCMAKE_PREFIX_PATH=${QT_PREFIX} \
+                        -DQt6_DIR=${QT_PREFIX}/Qt6 \
+                        -DQt6Svg_DIR=${QT_PREFIX}/Qt6Svg
+                '''
+            }
+        }
+
+        stage('Build') {
+            steps {
+                sh '''
+                    set -eu
+                    cmake --build build -j$(nproc)
+
+                    ls -la build/lazytv
+                    file build/lazytv | tee /tmp/lazytv-type
+
+                    if ! grep -q "dynamically linked" /tmp/lazytv-type; then
+                        echo "Бинарник статический или повреждён — прерываем."
+                        exit 1
+                    fi
+                '''
+            }
+        }
+
+        stage('Smoke test') {
+            steps {
+                sh '''
+                    set -eu
+                    QT_QPA_PLATFORM=offscreen ./build/lazytv --version \
+                        | tee /tmp/lazytv-version.txt
+                    grep -qE "^lazytv ${VERSION}$" /tmp/lazytv-version.txt
+                '''
+            }
+        }
+
+        stage('Package AppImage') {
+            steps {
+                sh '''
+                    set -eu
+
+                    rm -rf AppDir
+                    mkdir -p AppDir/usr/bin
+                    cp build/lazytv AppDir/usr/bin/lazytv
+                    chmod +x AppDir/usr/bin/lazytv
+
+                    cp lazytv.desktop AppDir/
+                    cp resources/ic_launcher.svg AppDir/lazytv.svg
+
+                    export EXTRA_QT_MODULES="svg;"
+                    export EXTRA_QT_PLUGINS="svg;"
+                    export EXTRA_PLATFORM_PLUGINS="libqxcb.so;"
+
+                    linuxdeploy \
+                        --appdir AppDir \
+                        --plugin qt \
+                        --output appimage \
+                        --desktop-file=lazytv.desktop \
+                        --icon-file=lazytv.svg
+
+                    mv LazyTV-x86_64.AppImage \
+                       "lazytv-${VERSION}-x86_64.AppImage"
+
+                    sha256sum "lazytv-${VERSION}-x86_64.AppImage" \
+                        > "lazytv-${VERSION}-x86_64.AppImage.sha256"
+
+                    ls -la "lazytv-${VERSION}-x86_64.AppImage"*
+                '''
+            }
+        }
+
+        stage('Smoke test AppImage') {
+            steps {
+                sh '''
+                    set -eu
+                    ./"lazytv-${VERSION}-x86_64.AppImage" --appimage-extract > /dev/null
+                    test -f squashfs-root/AppRun -o -L squashfs-root/AppRun
+                    file squashfs-root/usr/bin/lazytv
+                    readelf -d squashfs-root/usr/bin/lazytv | grep -E "RPATH|RUNPATH" || true
+                    rm -rf squashfs-root
+                '''
+            }
+        }
+    }
+
+    post {
+        success {
+            archiveArtifacts artifacts: "lazytv-${VERSION}-x86_64.AppImage,lazytv-${VERSION}-x86_64.AppImage.sha256",
+                             fingerprint: true,
+                             onlyIfSuccessful: true
+        }
+        cleanup {
+            sh 'rm -rf build AppDir'
+        }
+    }
+}
