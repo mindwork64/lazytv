@@ -8,30 +8,25 @@
 
 #include <lazytv/lazytv_export.h>
 
-class QNetworkAccessManager;
-
 namespace lazytv {
 
 /**
  * Клиент LG NetCast.
  *
  * Реализует протокол удалённого управления телевизорами LG (2010–2014,
- * серии LB/LA/LN/LV/LS/LE/UB/UC/UF). Общается с телевизором по локальной
- * сети, HTTP/XML, порт 8080.
+ * серии LB/LA/LN/LV/LS/LE/UB/UC/UF). Работает через QTcpSocket напрямую:
+ * HTTP/1.1 на IP-адрес, без прокси, без IPv6, без HTTP/2 negotiation.
  *
- * Типичный сценарий использования:
- *   1. Client client(ip);
- *   2. connect(...pairingKeyResult...) + client.requestPairingKey();
- *   3. connect(...pairingConfirmResult...) + client.confirmPairing(key);
- *   4. Сохранить session, при следующих запусках — client.setSession(session);
- *   5. client.warmUp();                  // опционально: прогреть соединение
- *   6. client.sendCommand(Client::Command::Power); // и т.д.
+ * Обрабатывает истёкшую сессию: при HTTP 401 клиент эмитит сигнал
+ * sessionExpired(), после чего все sendCommand игнорируются, пока
+ * не будет установлена новая сессия через confirmPairing().
  */
 class LAZYTV_EXPORT Client : public QObject {
     Q_OBJECT
 public:
     static constexpr int    kPort = 8080;
     static constexpr qint64 kMinCommandIntervalMs = 200;
+    static constexpr int    kRequestTimeoutMs = 8000;
 
     enum class Command : int {
         Power = 1,
@@ -55,79 +50,53 @@ public:
     };
     Q_ENUM(Command)
 
-    /** Хост — IP-адрес или hostname телевизора. */
-    explicit Client(QString host, QObject* parent = nullptr);
+    /** Результат сопряжения. */
+    struct PairingResult {
+        QString session;
+        int     httpStatus = 0;
+        int     roapError  = 0;
+        QString detail;
+    };
 
-    // --- Сессия -----------------------------------------------------------
+    explicit Client(QString host, QObject* parent = nullptr);
 
     void setSession(const QString& sid) { m_session = sid; }
     QString session() const { return m_session; }
 
-    // --- Прогрев соединения -----------------------------------------------
-
-    /**
-     * Прогревает HTTP-соединение к ТВ.
-     *
-     * Отправляет лёгкий GET на корень API, чтобы QNetworkAccessManager
-     * установил TCP-соединение заранее. Это устраняет задержку на первой
-     * команде, которая иначе тратит 1–2 секунды на TCP/HTTP handshake.
-     *
-     * Побочных эффектов на стороне ТВ нет. Безопасно вызывать повторно.
-     */
-    void warmUp();
-
-    // --- Сопряжение -------------------------------------------------------
-
-    /** Запрос кода на экране ТВ. Результат — сигнал pairingKeyResult. */
     void requestPairingKey();
-
-    /** Подтверждение кода. Результат — сигнал pairingConfirmResult. */
     void confirmPairing(const QString& key);
-
-    // --- Управление -------------------------------------------------------
-
-    /**
-     * Отправляет команду. Вызовы сериализуются, интервал между
-     * последовательными командами — не менее 200 мс (защита от
-     * перегрузки командного канала телевизора).
-     *
-     * Первая команда после создания клиента защищена автоматическим
-     * retry через 800 мс: если она ушла по «холодному» соединению и
-     * потерялась, вторая попытка пройдёт по уже установленному TCP.
-     */
     void sendCommand(Command cmd);
 
-    /** Преобразует цифру 0–9 в соответствующую команду. */
     static Command digit(int d);
 
 signals:
     void pairingKeyResult(bool ok);
-    /** Пустая строка — ошибка сопряжения. */
-    void pairingConfirmResult(const QString& session);
+    void pairingConfirmResult(const lazytv::Client::PairingResult& result);
     void commandResult(bool ok);
+    void sessionExpired();
 
 private:
-    static constexpr int    kTimeoutMs                 = 3000;
-    static constexpr int    kWarmUpTimeoutMs           = 500;
-    static constexpr qint64 kFirstCommandRetryDelayMs  = 800;
+    struct HttpResponse {
+        int statusCode = 0;
+        QByteArray body;
+    };
 
-    void post(const QString& url, const QByteArray& body,
-              std::function<void(int, QByteArray)> cb);
+    using HttpCallback = std::function<void(const HttpResponse&)>;
+
+    void sendHttp(const QByteArray& method,
+                  const QString& path,
+                  const QByteArray& body,
+                  HttpCallback cb);
+
     void tryProcessNext();
 
     QString m_host;
     QString m_session;
-    QNetworkAccessManager* m_nam = nullptr;
 
     QQueue<Command> m_queue;
     bool   m_inFlight = false;
     qint64 m_lastCommandAt = 0;
-
-    /**
-     * true — первая команда уже отправлялась (успешно или нет).
-     * Пока false, у первой команды есть право на один автоматический retry.
-     */
-    bool m_firstCommandSent = false;
+    bool   m_sessionExpired = false;
 };
 
 } // namespace lazytv

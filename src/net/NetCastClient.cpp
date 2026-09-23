@@ -1,18 +1,63 @@
 #include <lazytv/client.hpp>
 
 #include <QDateTime>
-#include <QNetworkAccessManager>
-#include <QNetworkReply>
-#include <QNetworkRequest>
+#include <QTcpSocket>
 #include <QTimer>
-#include <QUrl>
 #include <QXmlStreamReader>
+
+#include <memory>
 
 namespace lazytv {
 
+namespace {
+
+/** Разбирает HTTP-ответ, возвращает (status, body). */
+std::pair<int, QByteArray> parseHttp(const QByteArray& raw) {
+    const int headerEnd = raw.indexOf("\r\n\r\n");
+    if (headerEnd < 0) return {0, {}};
+
+    const int firstLineEnd = raw.indexOf("\r\n");
+    if (firstLineEnd < 0) return {0, {}};
+
+    const QByteArray firstLine = raw.left(firstLineEnd);
+    const QList<QByteArray> parts = firstLine.split(' ');
+    if (parts.size() < 2) return {0, {}};
+
+    bool ok = false;
+    const int status = parts.at(1).toInt(&ok);
+    if (!ok) return {0, {}};
+
+    return {status, raw.mid(headerEnd + 4)};
+}
+
+/** Разбирает <envelope> из ответа ROAP. */
+struct RoapEnvelope {
+    int     roapError = 0;
+    QString detail;
+    QString session;
+};
+
+RoapEnvelope parseRoap(const QByteArray& body) {
+    RoapEnvelope env;
+    QXmlStreamReader r(body);
+    while (!r.atEnd()) {
+        r.readNext();
+        if (!r.isStartElement()) continue;
+        if (r.name() == QStringLiteral("ROAPError")) {
+            env.roapError = r.readElementText().toInt();
+        } else if (r.name() == QStringLiteral("ROAPErrorDetail")) {
+            env.detail = r.readElementText();
+        } else if (r.name() == QStringLiteral("session")) {
+            env.session = r.readElementText();
+        }
+    }
+    return env;
+}
+
+} // namespace
+
 Client::Client(QString host, QObject* parent)
-    : QObject(parent), m_host(std::move(host)),
-      m_nam(new QNetworkAccessManager(this)) {}
+    : QObject(parent), m_host(std::move(host)) {}
 
 Client::Command Client::digit(int d) {
     if (d < 0) d = 0;
@@ -20,77 +65,154 @@ Client::Command Client::digit(int d) {
     return static_cast<Command>(static_cast<int>(Command::Number0) + d);
 }
 
-void Client::warmUp() {
-    if (m_host.isEmpty()) return;
+void Client::sendHttp(const QByteArray& method,
+                      const QString& path,
+                      const QByteArray& body,
+                      HttpCallback cb) {
+    auto* socket = new QTcpSocket(this);
+    auto buffer       = std::make_shared<QByteArray>();
+    auto finished     = std::make_shared<bool>(false);
+    auto callback     = std::make_shared<HttpCallback>(std::move(cb));
+    auto expectedBody = std::make_shared<int>(-1);
 
-    // GET на корень API. ТВ ответит 404 или что-то ещё — нам важен
-    // только сам факт установки TCP-соединения в QNetworkAccessManager.
-    const QString url = QStringLiteral("http://%1:%2/").arg(m_host).arg(kPort);
+    auto finish = [socket, buffer, finished, callback](int status) {
+        if (*finished) return;
+        *finished = true;
 
-    QNetworkRequest req{QUrl(url)};
-    req.setTransferTimeout(kWarmUpTimeoutMs);
-    req.setAttribute(QNetworkRequest::RedirectPolicyAttribute,
-                     QNetworkRequest::NoLessSafeRedirectPolicy);
+        HttpResponse r;
+        r.statusCode = status;
+        if (status > 0) {
+            r.body = parseHttp(*buffer).second;
+        }
+        if (*callback) (*callback)(r);
 
-    QNetworkReply* reply = m_nam->get(req);
-    connect(reply, &QNetworkReply::finished, reply, &QNetworkReply::deleteLater);
-}
+        socket->abort();
+        socket->deleteLater();
+    };
 
-void Client::post(const QString& url, const QByteArray& body,
-                  std::function<void(int, QByteArray)> cb) {
-    QNetworkRequest req{QUrl(url)};
-    req.setHeader(QNetworkRequest::ContentTypeHeader, "application/atom+xml");
-    req.setTransferTimeout(kTimeoutMs);
+    auto tryComplete = [buffer, finished, expectedBody, finish]() {
+        if (*finished) return;
 
-    QNetworkReply* reply = m_nam->post(req, body);
-    connect(reply, &QNetworkReply::finished, this,
-            [reply, cb = std::move(cb)]() {
-                const int code = reply->attribute(
-                    QNetworkRequest::HttpStatusCodeAttribute).toInt();
-                const QByteArray data = reply->readAll();
-                cb(code, data);
-                reply->deleteLater();
-            });
+        const int headerEnd = buffer->indexOf("\r\n\r\n");
+        if (headerEnd < 0) return;
+
+        const int firstLineEnd = buffer->indexOf("\r\n");
+        if (firstLineEnd < 0) return;
+
+        const QByteArray firstLine = buffer->left(firstLineEnd);
+        const QList<QByteArray> parts = firstLine.split(' ');
+        if (parts.size() < 2) return;
+        bool ok = false;
+        const int status = parts.at(1).toInt(&ok);
+        if (!ok) return;
+
+        if (*expectedBody < 0) {
+            const QByteArray headers = buffer->left(headerEnd).toLower();
+            const int clPos = headers.indexOf("content-length:");
+            if (clPos >= 0) {
+                const int lineEnd = headers.indexOf("\r\n", clPos);
+                const QByteArray clLine = headers.mid(clPos, lineEnd - clPos);
+                const QByteArray clValue =
+                    clLine.mid(clLine.indexOf(':') + 1).trimmed();
+                *expectedBody = clValue.toInt();
+            } else {
+                *expectedBody = -2;
+            }
+        }
+
+        if (*expectedBody >= 0) {
+            const int bodyReceived = buffer->size() - headerEnd - 4;
+            if (bodyReceived >= *expectedBody) {
+                finish(status);
+            }
+        }
+    };
+
+    QTimer::singleShot(kRequestTimeoutMs, socket,
+                       [finish]() { finish(0); });
+
+    connect(socket, &QTcpSocket::connected, this,
+            [socket, method, path, body, this]() {
+        QByteArray req;
+        req.append(method).append(' ').append(path.toUtf8())
+           .append(" HTTP/1.1\r\n");
+        req.append("Host: ").append(m_host.toUtf8())
+           .append(':').append(QByteArray::number(kPort)).append("\r\n");
+        req.append("User-Agent: LazyTV/1.0\r\n");
+        req.append("Connection: close\r\n");
+        if (!body.isEmpty()) {
+            req.append("Content-Type: application/atom+xml\r\n");
+            req.append("Content-Length: ")
+               .append(QByteArray::number(body.size())).append("\r\n");
+        }
+        req.append("\r\n");
+        req.append(body);
+
+        socket->write(req);
+        socket->flush();
+    });
+
+    connect(socket, &QTcpSocket::readyRead, this,
+            [socket, buffer, tryComplete]() {
+        *buffer += socket->readAll();
+        tryComplete();
+    });
+
+    connect(socket, &QTcpSocket::disconnected, this,
+            [buffer, finish]() {
+        const int status = parseHttp(*buffer).first;
+        finish(status);
+    });
+
+    connect(socket, &QTcpSocket::errorOccurred, this,
+            [finish](QAbstractSocket::SocketError) { finish(0); });
+
+    socket->connectToHost(m_host, kPort);
 }
 
 void Client::requestPairingKey() {
-    const QString url = QStringLiteral("http://%1:%2/roap/api/auth")
-                            .arg(m_host).arg(kPort);
     const QByteArray body =
         "<?xml version=\"1.0\" encoding=\"utf-8\"?>"
         "<auth><type>AuthKeyReq</type></auth>";
 
-    post(url, body, [this](int code, QByteArray) {
-        emit pairingKeyResult(code == 200);
+    sendHttp("POST", QStringLiteral("/roap/api/auth"), body,
+             [this](const HttpResponse& r) {
+        emit pairingKeyResult(r.statusCode == 200);
     });
 }
 
 void Client::confirmPairing(const QString& key) {
-    const QString url = QStringLiteral("http://%1:%2/roap/api/auth")
-                            .arg(m_host).arg(kPort);
     const QByteArray body =
         QStringLiteral("<?xml version=\"1.0\" encoding=\"utf-8\"?>"
-                       "<auth><type>AuthReq</type><value>%1</value></auth>")
+                       "<auth><type>AuthReq</type>"
+                       "<value>%1</value></auth>")
             .arg(key).toUtf8();
 
-    post(url, body, [this](int code, QByteArray data) {
-        if (code != 200) { emit pairingConfirmResult(QString()); return; }
+    sendHttp("POST", QStringLiteral("/roap/api/auth"), body,
+             [this](const HttpResponse& r) {
+        PairingResult result;
+        result.httpStatus = r.statusCode;
 
-        QString session;
-        QXmlStreamReader r(data);
-        while (!r.atEnd()) {
-            r.readNext();
-            if (r.isStartElement() && r.name() == QStringLiteral("session")) {
-                session = r.readElementText();
-                break;
+        if (r.statusCode == 200) {
+            const auto env = parseRoap(r.body);
+            result.roapError = env.roapError;
+            result.detail    = env.detail;
+            result.session   = env.session;
+
+            if (!result.session.isEmpty()) {
+                m_session = result.session;
+                m_sessionExpired = false;
             }
         }
-        if (!session.isEmpty()) m_session = session;
-        emit pairingConfirmResult(session);
+
+        emit pairingConfirmResult(result);
     });
 }
 
 void Client::sendCommand(Command cmd) {
+    if (m_sessionExpired) {
+        return;
+    }
     m_queue.enqueue(cmd);
     tryProcessNext();
 }
@@ -113,12 +235,8 @@ void Client::tryProcessNext() {
     }
 
     const Command cmd = m_queue.dequeue();
-    const bool isFirstCommand = !m_firstCommandSent;
-    m_firstCommandSent = true;
     m_inFlight = true;
 
-    const QString url = QStringLiteral("http://%1:%2/roap/api/command")
-                            .arg(m_host).arg(kPort);
     const QByteArray body =
         QStringLiteral("<?xml version=\"1.0\" encoding=\"utf-8\"?>"
                        "<command><session>%1</session>"
@@ -126,22 +244,20 @@ void Client::tryProcessNext() {
                        "<value>%2</value></command>")
             .arg(m_session).arg(static_cast<int>(cmd)).toUtf8();
 
-    post(url, body, [this, cmd, isFirstCommand](int code, QByteArray) {
+    sendHttp("POST", QStringLiteral("/roap/api/command"), body,
+             [this](const HttpResponse& r) {
         m_lastCommandAt = QDateTime::currentMSecsSinceEpoch();
         m_inFlight = false;
 
-        const bool ok = (code == 200);
-
-        // Retry ровно один раз, только для самой первой команды после
-        // создания клиента. Первая попытка могла уйти по «холодному»
-        // соединению и потеряться; вторая пойдёт по уже установленному TCP.
-        if (!ok && isFirstCommand) {
-            m_queue.prepend(cmd);
-            QTimer::singleShot(kFirstCommandRetryDelayMs, this,
-                               &Client::tryProcessNext);
+        if (r.statusCode == 401) {
+            m_sessionExpired = true;
+            m_queue.clear();
+            m_session.clear();
+            emit sessionExpired();
             return;
         }
 
+        const bool ok = (r.statusCode == 200);
         emit commandResult(ok);
         tryProcessNext();
     });

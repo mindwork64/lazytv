@@ -6,7 +6,6 @@
 #include <QLabel>
 #include <QShowEvent>
 #include <QStackedWidget>
-#include <QTcpSocket>
 #include <QTimer>
 #include <QVBoxLayout>
 
@@ -22,9 +21,6 @@
 using Cmd = lazytv::Client::Command;
 
 namespace {
-
-constexpr int kReachabilityIntervalMs = 30'000;   // 30 секунд
-constexpr int kReachabilityTimeoutMs  = 2'000;    // 2 секунды на probe
 
 QWidget* wrapColumn(std::initializer_list<QWidget*> widgets, int spacing = 14) {
     auto* w = new QWidget;
@@ -68,25 +64,22 @@ RemoteScreen::RemoteScreen(lazytv::AppContainer* container, QWidget* parent)
     m_errorBanner->setVisible(false);
     root->addWidget(m_errorBanner);
 
-    // Пересчёт отображаемого статуса раз в 5 секунд — на случай,
-    // что с момента последней команды прошло много времени.
     m_statusTimer = new QTimer(this);
     m_statusTimer->setInterval(5'000);
     connect(m_statusTimer, &QTimer::timeout,
             this, &RemoteScreen::recomputeStatus);
     m_statusTimer->start();
 
-    // Проверка доступности ТВ через TCP-probe раз в 30 секунд.
-    m_reachabilityTimer = new QTimer(this);
-    m_reachabilityTimer->setInterval(kReachabilityIntervalMs);
-    connect(m_reachabilityTimer, &QTimer::timeout,
-            this, &RemoteScreen::checkReachability);
-    m_reachabilityTimer->start();
-
     connect(&ThemeManager::instance(), &ThemeManager::changed, this, [this]() {
         m_statusBar->update();
         updateErrorBannerStyle();
     });
+
+    // Если клиент создан и ТВ отверг сессию — переключаемся на сопряжение.
+    if (auto* client = m_container->getClient()) {
+        connect(client, &lazytv::Client::sessionExpired, this,
+                &RemoteScreen::disconnected);
+    }
 }
 
 void RemoteScreen::showEvent(QShowEvent* /*event*/) {
@@ -95,71 +88,6 @@ void RemoteScreen::showEvent(QShowEvent* /*event*/) {
         return;
     }
     m_statusBar->setIp(m_container->store().ip().value_or(QString()));
-
-    // Прогреваем HTTP-соединение, чтобы первая команда ушла без задержки.
-    // Если клиент ещё не создан — getClient() создаст его с сохранённой сессией.
-    if (auto* client = m_container->getClient()) {
-        client->warmUp();
-    }
-
-    QTimer::singleShot(0, this, &RemoteScreen::checkReachability);
-}
-
-void RemoteScreen::checkReachability() {
-    const QString ip = m_container->store().ip().value_or(QString());
-    if (ip.isEmpty()) {
-        m_reachable = false;
-        recomputeStatus();
-        return;
-    }
-
-    // Отменяем предыдущий probe, если он ещё висит.
-    if (m_probeSocket) {
-        m_probeSocket->abort();
-        m_probeSocket->deleteLater();
-        m_probeSocket.clear();
-    }
-
-    auto* socket = new QTcpSocket(this);
-    m_probeSocket = socket;
-
-    auto finish = [this, socket](bool ok) {
-        if (socket) {
-            socket->abort();
-            socket->deleteLater();
-        }
-        if (m_probeSocket == socket) {
-            m_probeSocket.clear();
-        }
-        m_reachable = ok;
-        recomputeStatus();
-    };
-
-    connect(socket, &QTcpSocket::connected, this, [finish]() mutable {
-        finish(true);
-    });
-
-    connect(socket, &QTcpSocket::errorOccurred, this,
-            [finish](QAbstractSocket::SocketError) mutable {
-        finish(false);
-    });
-
-    // Страховка на случай, если ни connected, ни errorOccurred не сработают
-    // (например, из-за потери пакетов).
-    QTimer::singleShot(kReachabilityTimeoutMs, socket, [this, socket]() {
-        if (!socket) return;
-        if (socket->state() != QAbstractSocket::ConnectedState) {
-            socket->abort();
-            socket->deleteLater();
-            if (m_probeSocket == socket) {
-                m_probeSocket.clear();
-            }
-            m_reachable = false;
-            recomputeStatus();
-        }
-    });
-
-    socket->connectToHost(ip, lazytv::Client::kPort);
 }
 
 QWidget* RemoteScreen::buildMainPage() {
@@ -300,8 +228,6 @@ void RemoteScreen::onCommandResult(bool ok) {
     if (ok) {
         m_lastSuccessAt = QDateTime::currentMSecsSinceEpoch();
         m_lastAttemptFailed = false;
-        // Успешная команда подтверждает, что ТВ точно доступен.
-        m_reachable = true;
         m_errorBanner->setVisible(false);
     } else {
         m_lastAttemptFailed = true;
@@ -314,18 +240,14 @@ void RemoteScreen::onCommandResult(bool ok) {
 
 void RemoteScreen::recomputeStatus() {
     const qint64 now = QDateTime::currentMSecsSinceEpoch();
-
     ConnectionStatus s;
     if (m_lastAttemptFailed) {
         s = ConnectionStatus::Offline;
     } else if (m_lastSuccessAt > 0 && now - m_lastSuccessAt < 60'000) {
         s = ConnectionStatus::Online;
-    } else if (m_reachable.has_value() && !m_reachable.value()) {
-        s = ConnectionStatus::Offline;
     } else {
         s = ConnectionStatus::Stale;
     }
-
     m_status = s;
     m_statusBar->setStatus(s);
 }
