@@ -144,7 +144,7 @@ pipeline {
                         --desktop-file=lazytv.desktop \
                         --icon-file=lazytv.svg
 
-                    mv LazyTV-x86_64.AppImage \
+                    mv "LazyTV-${VERSION}-x86_64.AppImage" \
                        "lazytv-${VERSION}-x86_64.AppImage"
 
                     sha256sum "lazytv-${VERSION}-x86_64.AppImage" \
