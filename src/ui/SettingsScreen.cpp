@@ -1,5 +1,6 @@
 #include "ui/SettingsScreen.hpp"
 
+#include <QCoreApplication>
 #include <QFrame>
 #include <QHBoxLayout>
 #include <QLabel>
@@ -79,7 +80,7 @@ SettingsScreen::SettingsScreen(lazytv::AppContainer *container, QWidget *parent)
   root->addWidget(mkLine());
 
   root->addWidget(new QLabel("Версия", this));
-  root->addWidget(new QLabel("1.1.0 (1)", this));
+  root->addWidget(new QLabel(QCoreApplication::applicationVersion(), this));
 
   root->addStretch();
   refresh();
