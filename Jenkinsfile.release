@@ -43,11 +43,18 @@ pipeline {
 
         stage('Checkout') {
             steps {
-                checkout scm
                 sh '''
                     set -eu
                     git fetch --tags --force
-                    git checkout "${GIT_REF}"
+
+                    # Если GIT_REF — ветка (например main), берём её из origin.
+                    # Если тег — берём тег. Оба случая через --force.
+                    if git show-ref --verify --quiet "refs/remotes/origin/${GIT_REF}"; then
+                        git checkout --force "origin/${GIT_REF}"
+                    else
+                        git checkout --force "${GIT_REF}"
+                    fi
+
                     git rev-parse --short HEAD > .git-sha
                     echo "Building ref: ${GIT_REF}"
                     echo "Commit:       $(cat .git-sha)"
