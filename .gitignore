@@ -37,4 +37,4 @@ lazytv-*-x86_64.AppImage.sha256
 
 # Temporary copy for linuxdeploy (created from resources/ic_launcher.svg)
 lazytv.svg
-apicdocs/
+apidocs/
