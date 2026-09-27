@@ -1,3 +1,18 @@
+lazytv (1.1.1-1) noble; urgency=medium
+
+  * Read the HTTP response body by Content-Length instead of waiting for
+    socket disconnect — commands no longer get lost on a slow TV.
+  * Handle session expiry: on HTTP 401 the client emits sessionExpired,
+    clears the saved session and returns to the pairing screen.
+  * Parse ROAPError/ROAPErrorDetail so a rejected command reports why.
+  * Block the pairing "request code" button for 60 s after a success
+    (a repeated request invalidates the code shown on the TV).
+  * Settings screen: show the version from the build instead of a
+    hardcoded string.
+  * Packaging: trailing newline in debian/{changelog,control,rules},
+    add scripts/release-ppa.sh and release notes for 1.1.1.
+
+ -- mindwork64 <vmurashov85@gmail.com>  Sun, 27 Sep 2026 05:39:28 +0300
 lazytv (1.1.0-1) noble; urgency=medium
 
   * Initial release under the LazyTV name.

@@ -31,6 +31,7 @@ lazytv_*.debian.tar.xz
 lazytv_*.changes
 lazytv_*.buildinfo
 lazytv_*.build
+lazytv_*.upload
 
 # sha256 только для бинарных сборок
 lazytv-*-x86_64.AppImage.sha256

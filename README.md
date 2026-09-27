@@ -127,12 +127,12 @@ lazytv
 
 ### Вариант 2 — AppImage (самый универсальный)
 
-Скачайте `lazytv-1.1.0-x86_64.AppImage` со страницы
+Скачайте `lazytv-1.1.1-x86_64.AppImage` со страницы
 [последнего релиза](https://github.com/mindwork64/lazytv/releases/latest).
 
 ```bash
-chmod +x lazytv-1.1.0-x86_64.AppImage
-./lazytv-1.1.0-x86_64.AppImage
+chmod +x lazytv-1.1.1-x86_64.AppImage
+./lazytv-1.1.1-x86_64.AppImage
 ```
 
 Никаких зависимостей устанавливать не нужно — Qt и все библиотеки упакованы
@@ -150,7 +150,7 @@ sudo apt install libfuse2         # Ubuntu 22.04 и старше
 Или запустите без FUSE (медленнее стартует, но работает):
 
 ```bash
-./lazytv-1.1.0-x86_64.AppImage --appimage-extract-and-run
+./lazytv-1.1.1-x86_64.AppImage --appimage-extract-and-run
 ```
 
 ### Вариант 3 — из исходников
