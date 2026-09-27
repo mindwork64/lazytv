@@ -24,6 +24,9 @@ class RemoteScreen : public QWidget {
 public:
     explicit RemoteScreen(lazytv::AppContainer* container, QWidget* parent = nullptr);
 
+    /** Включает/выключает горячие клавиши (настройка «Горячие клавиши»). */
+    void setHotkeysEnabled(bool v);
+
 signals:
     void openSettings();
     void disconnected();

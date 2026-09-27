@@ -44,6 +44,11 @@ MainWindow::MainWindow(lazytv::AppContainer *container)
     m_container->store().setThemeMode(m);
     ThemeManager::instance().apply(m);
   });
+  connect(m_settings, &SettingsScreen::hotkeysEnabledChanged, this,
+          [this](bool v) {
+            m_container->store().setHotkeysEnabled(v);
+            m_remote->setHotkeysEnabled(v);
+          });
 
   showScreen(container->store().session() ? Remote : Pairing);
 }

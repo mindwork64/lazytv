@@ -30,6 +30,7 @@ void SessionStore::load() {
   if (o.contains("session") && !o["session"].isNull())
     m_session = o["session"].toString();
   m_themeMode = o.value("themeMode").toInt(1);
+  m_hotkeysEnabled = o.value("hotkeysEnabled").toBool(true);
 }
 
 void SessionStore::save() {
@@ -37,6 +38,7 @@ void SessionStore::save() {
   o["ip"] = m_ip ? QJsonValue(*m_ip) : QJsonValue::Null;
   o["session"] = m_session ? QJsonValue(*m_session) : QJsonValue::Null;
   o["themeMode"] = m_themeMode;
+  o["hotkeysEnabled"] = m_hotkeysEnabled;
 
   QFile f(m_path);
   if (!f.open(QIODevice::WriteOnly | QIODevice::Truncate))
@@ -59,6 +61,11 @@ void SessionStore::setThemeMode(int m) {
   save();
 }
 
+void SessionStore::setHotkeysEnabled(bool v) {
+  m_hotkeysEnabled = v;
+  save();
+}
+
 void SessionStore::clearSession() {
   m_session.reset();
   save();
@@ -68,6 +75,7 @@ void SessionStore::clearAll() {
   m_ip.reset();
   m_session.reset();
   m_themeMode = 1;
+  m_hotkeysEnabled = true;
   save();
 }
 

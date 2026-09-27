@@ -8,6 +8,7 @@ class AppContainer;
 
 class QLabel;
 class QRadioButton;
+class QCheckBox;
 
 class SettingsScreen : public QWidget {
   Q_OBJECT
@@ -21,6 +22,7 @@ signals:
   void disconnect();
   void back();
   void themeModeChanged(int);
+  void hotkeysEnabledChanged(bool);
 
 private:
   lazytv::AppContainer *m_container;
@@ -28,4 +30,5 @@ private:
   QRadioButton *m_sys = nullptr;
   QRadioButton *m_dark = nullptr;
   QRadioButton *m_light = nullptr;
+  QCheckBox *m_hotkeys = nullptr;
 };

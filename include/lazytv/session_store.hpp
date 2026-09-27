@@ -29,6 +29,10 @@ public:
   int themeMode() const { return m_themeMode; }
   void setThemeMode(int m);
 
+  /** Горячие клавиши на экране пульта (по умолчанию включены). */
+  bool hotkeysEnabled() const { return m_hotkeysEnabled; }
+  void setHotkeysEnabled(bool v);
+
   void clearSession();
   void clearAll();
 
@@ -43,6 +47,7 @@ private:
   std::optional<QString> m_ip;
   std::optional<QString> m_session;
   int m_themeMode = 1;
+  bool m_hotkeysEnabled = true;
 };
 
 } // namespace lazytv

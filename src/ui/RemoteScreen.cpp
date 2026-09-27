@@ -68,6 +68,7 @@ RemoteScreen::RemoteScreen(lazytv::AppContainer* container, QWidget* parent)
     root->addWidget(m_pages, 1);
 
     m_hotkeys = new HotkeyHandler(this);
+    m_hotkeys->setEnabled(m_container->store().hotkeysEnabled());
     connect(m_hotkeys, &HotkeyHandler::commandRequested, this,
             [this](Cmd cmd) {
                 flashButton(cmd);
@@ -109,6 +110,10 @@ void RemoteScreen::showEvent(QShowEvent* /*event*/) {
     // Без явного фокуса после возврата из «Настройки» клавиши
     // уходят экрану настроек, а не пульту.
     setFocus(Qt::OtherFocusReason);
+}
+
+void RemoteScreen::setHotkeysEnabled(bool v) {
+    m_hotkeys->setEnabled(v);
 }
 
 void RemoteScreen::keyPressEvent(QKeyEvent* event) {

@@ -1,5 +1,6 @@
 #include "ui/SettingsScreen.hpp"
 
+#include <QCheckBox>
 #include <QCoreApplication>
 #include <QFrame>
 #include <QHBoxLayout>
@@ -79,6 +80,20 @@ SettingsScreen::SettingsScreen(lazytv::AppContainer *container, QWidget *parent)
 
   root->addWidget(mkLine());
 
+  root->addWidget(new QLabel("Управление", this));
+
+  m_hotkeys = new QCheckBox("Горячие клавиши", this);
+  m_hotkeys->setChecked(m_container->store().hotkeysEnabled());
+  m_hotkeys->setToolTip(
+      "Клавиатура управляет телевизором на экране пульта:\n"
+      "стрелки, Enter, Esc, Backspace, P, M, H, I, +/-, PageUp/PageDown, "
+      "цифры, Tab");
+  connect(m_hotkeys, &QCheckBox::toggled, this,
+          &SettingsScreen::hotkeysEnabledChanged);
+  root->addWidget(m_hotkeys);
+
+  root->addWidget(mkLine());
+
   root->addWidget(new QLabel("Версия", this));
   root->addWidget(new QLabel(QCoreApplication::applicationVersion(), this));
 
@@ -92,4 +107,5 @@ void SettingsScreen::refresh() {
   m_sys->setChecked(mode == 0);
   m_dark->setChecked(mode == 1);
   m_light->setChecked(mode == 2);
+  m_hotkeys->setChecked(m_container->store().hotkeysEnabled());
 }
