@@ -3,6 +3,7 @@
 #include <QDateTime>
 #include <QGridLayout>
 #include <QHBoxLayout>
+#include <QKeyEvent>
 #include <QLabel>
 #include <QShowEvent>
 #include <QStackedWidget>
@@ -13,6 +14,7 @@
 #include <lazytv/client.hpp>
 
 #include "theme/Theme.hpp"
+#include "ui/HotkeyHandler.hpp"
 #include "ui/widgets/DPad.hpp"
 #include "ui/widgets/IconButton.hpp"
 #include "ui/widgets/Keypad.hpp"
@@ -45,6 +47,9 @@ QWidget* wrapRow(std::initializer_list<QWidget*> widgets, int spacing = 12) {
 RemoteScreen::RemoteScreen(lazytv::AppContainer* container, QWidget* parent)
     : QWidget(parent), m_container(container) {
 
+    // Фокус держим на себе: клавиатура — это пульт (см. keyPressEvent).
+    setFocusPolicy(Qt::StrongFocus);
+
     auto* root = new QVBoxLayout(this);
     root->setContentsMargins(20, 12, 20, 12);
     root->setSpacing(14);
@@ -58,6 +63,13 @@ RemoteScreen::RemoteScreen(lazytv::AppContainer* container, QWidget* parent)
     m_pages->addWidget(buildMainPage());
     m_pages->addWidget(buildNumbersPage());
     root->addWidget(m_pages, 1);
+
+    m_hotkeys = new HotkeyHandler(this);
+    connect(m_hotkeys, &HotkeyHandler::commandRequested,
+            this, &RemoteScreen::sendCommand);
+    connect(m_hotkeys, &HotkeyHandler::switchPage, this, [this] {
+        m_pages->setCurrentIndex(m_pages->currentIndex() == 0 ? 1 : 0);
+    });
 
     m_errorBanner = new QLabel(this);
     m_errorBanner->setWordWrap(true);
@@ -88,6 +100,17 @@ void RemoteScreen::showEvent(QShowEvent* /*event*/) {
         return;
     }
     m_statusBar->setIp(m_container->store().ip().value_or(QString()));
+    // Без явного фокуса после возврата из «Настройки» клавиши
+    // уходят экрану настроек, а не пульту.
+    setFocus(Qt::OtherFocusReason);
+}
+
+void RemoteScreen::keyPressEvent(QKeyEvent* event) {
+    if (m_hotkeys->handle(event)) {
+        event->accept();
+        return;
+    }
+    QWidget::keyPressEvent(event);
 }
 
 QWidget* RemoteScreen::buildMainPage() {

@@ -7,6 +7,9 @@ IconButton::IconButton(QString svgPath, QString label, QWidget *parent)
     : QAbstractButton(parent), m_svg(std::move(svgPath)),
       m_label(std::move(label)) {
   setCursor(Qt::PointingHandCursor);
+  // Кнопки пульта не участвуют в обходе фокуса: клавиатуру обрабатывает
+  // RemoteScreen (иначе Enter/Space нажали бы кнопку вместо команды OK).
+  setFocusPolicy(Qt::NoFocus);
   connect(&ThemeManager::instance(), &ThemeManager::changed, this,
           qOverload<>(&QWidget::update));
 }

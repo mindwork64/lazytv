@@ -71,6 +71,7 @@ qt_add_executable(lazytv-app
     src/ui/RemoteScreen.cpp
     src/ui/PairingScreen.cpp
     src/ui/SettingsScreen.cpp
+    src/ui/HotkeyHandler.cpp
     src/ui/widgets/IconButton.cpp
     src/ui/widgets/StatusBar.cpp
     src/ui/widgets/DPad.cpp

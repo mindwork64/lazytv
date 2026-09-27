@@ -11,6 +11,8 @@ namespace lazytv { class AppContainer; }
 class QStackedWidget;
 class QLabel;
 class QTimer;
+class QKeyEvent;
+class HotkeyHandler;
 
 class RemoteScreen : public QWidget {
     Q_OBJECT
@@ -23,6 +25,7 @@ signals:
 
 protected:
     void showEvent(QShowEvent* event) override;
+    void keyPressEvent(QKeyEvent* event) override;
 
 private:
     QWidget* buildMainPage();
@@ -34,6 +37,7 @@ private:
     void updateErrorBannerStyle();
 
     lazytv::AppContainer* m_container = nullptr;
+    HotkeyHandler*  m_hotkeys   = nullptr;
     StatusBar*      m_statusBar = nullptr;
     QStackedWidget* m_pages     = nullptr;
     QLabel*         m_errorBanner = nullptr;

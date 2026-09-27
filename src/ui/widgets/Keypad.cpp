@@ -6,6 +6,8 @@
 KeypadKey::KeypadKey(int digit, QWidget *parent)
     : QAbstractButton(parent), m_digit(digit) {
   setCursor(Qt::PointingHandCursor);
+  // См. IconButton: клавиатуру обрабатывает RemoteScreen.
+  setFocusPolicy(Qt::NoFocus);
   setMinimumHeight(64);
   connect(&ThemeManager::instance(), &ThemeManager::changed, this,
           qOverload<>(&QWidget::update));
