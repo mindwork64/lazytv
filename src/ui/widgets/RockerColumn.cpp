@@ -17,6 +17,12 @@ RockerColumn::RockerColumn(const QString &label, QWidget *parent)
       emit minus();
   });
 
+  m_flashTimer.setSingleShot(true);
+  connect(&m_flashTimer, &QTimer::timeout, this, [this]() {
+    m_flashOn = false;
+    update();
+  });
+
   connect(&ThemeManager::instance(), &ThemeManager::changed, this,
           qOverload<>(&QWidget::update));
 }
@@ -31,6 +37,15 @@ void RockerColumn::recompute() {
   m_minusRect = QRectF(r.left(), r.top() + halfH + labelH, r.width(), halfH);
 }
 
+void RockerColumn::flash(Half half, int ms) {
+  if (half == Half::None)
+    return;
+  m_flashPart = half;
+  m_flashOn = true;
+  update();
+  m_flashTimer.start(ms);
+}
+
 void RockerColumn::paintEvent(QPaintEvent *) {
   recompute();
   const auto &p = ThemeManager::instance().palette();
@@ -42,12 +57,26 @@ void RockerColumn::paintEvent(QPaintEvent *) {
   g.setPen(QPen(p.outline, 1));
   g.drawRoundedRect(rect().adjusted(0, 0, -1, -1), 14, 14);
 
+  const bool litPlus  = m_flashOn && m_flashPart == Half::Plus;
+  const bool litMinus = m_flashOn && m_flashPart == Half::Minus;
+
+  auto fillHalf = [&](const QRectF &box) {
+    g.setBrush(p.primary);
+    g.setPen(Qt::NoPen);
+    g.drawRoundedRect(box.adjusted(1.5, 1.5, -1.5, -1.5), 12, 12);
+  };
+  if (litPlus)
+    fillHalf(m_plusRect);
+  if (litMinus)
+    fillHalf(m_minusRect);
+
   QFont big = font();
   big.setPointSize(20);
   big.setWeight(QFont::Light);
   g.setFont(big);
-  g.setPen(p.onSurface);
+  g.setPen(litPlus ? p.onPrimary : p.onSurface);
   g.drawText(m_plusRect, Qt::AlignCenter, "+");
+  g.setPen(litMinus ? p.onPrimary : p.onSurface);
   g.drawText(m_minusRect, Qt::AlignCenter, "−");
 
   QFont small = font();

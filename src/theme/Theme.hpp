@@ -12,6 +12,7 @@ struct Palette {
   QColor onSurfaceVariant;
   QColor outline;
   QColor primary;
+  QColor onPrimary{0xFF, 0xFF, 0xFF};
   QColor error;
   QColor errorContainer;
   QColor onErrorContainer;

@@ -24,6 +24,9 @@ using Cmd = lazytv::Client::Command;
 
 namespace {
 
+/** Длительность подсветки кнопки при нажатии горячей клавиши, мс. */
+constexpr int kFlashMs = 120;
+
 QWidget* wrapColumn(std::initializer_list<QWidget*> widgets, int spacing = 14) {
     auto* w = new QWidget;
     auto* l = new QVBoxLayout(w);
@@ -65,8 +68,11 @@ RemoteScreen::RemoteScreen(lazytv::AppContainer* container, QWidget* parent)
     root->addWidget(m_pages, 1);
 
     m_hotkeys = new HotkeyHandler(this);
-    connect(m_hotkeys, &HotkeyHandler::commandRequested,
-            this, &RemoteScreen::sendCommand);
+    connect(m_hotkeys, &HotkeyHandler::commandRequested, this,
+            [this](Cmd cmd) {
+                flashButton(cmd);
+                sendCommand(cmd);
+            });
     connect(m_hotkeys, &HotkeyHandler::switchPage, this, [this] {
         m_pages->setCurrentIndex(m_pages->currentIndex() == 0 ? 1 : 0);
     });
@@ -119,6 +125,7 @@ QWidget* RemoteScreen::buildMainPage() {
     auto* power = new IconButton(":/icons/power.svg", "", page);
     power->setLabelVisible(false);
     power->setFixedSize(56, 56);
+    m_iconByCmd.insert(static_cast<int>(Cmd::Power), power);
     connect(power, &QAbstractButton::clicked, this,
             [this] { sendCommand(Cmd::Power); });
 
@@ -128,37 +135,40 @@ QWidget* RemoteScreen::buildMainPage() {
     powerLayout->addWidget(power);
     powerLayout->addStretch();
 
-    auto* vol = new RockerColumn("VOL", page);
-    connect(vol, &RockerColumn::plus,  this, [this] { sendCommand(Cmd::VolumeUp);   });
-    connect(vol, &RockerColumn::minus, this, [this] { sendCommand(Cmd::VolumeDown); });
+    m_vol = new RockerColumn("VOL", page);
+    connect(m_vol, &RockerColumn::plus,  this, [this] { sendCommand(Cmd::VolumeUp);   });
+    connect(m_vol, &RockerColumn::minus, this, [this] { sendCommand(Cmd::VolumeDown); });
 
     auto* home = new IconButton(":/icons/home.svg", "HOME", page);
     home->setMinimumHeight(72);
+    m_iconByCmd.insert(static_cast<int>(Cmd::HomeMenu), home);
     connect(home, &QAbstractButton::clicked, this,
             [this] { sendCommand(Cmd::HomeMenu); });
 
     auto* exitBtn = new IconButton(":/icons/exit.svg", "EXIT", page);
     exitBtn->setMinimumHeight(72);
+    m_iconByCmd.insert(static_cast<int>(Cmd::Exit), exitBtn);
     connect(exitBtn, &QAbstractButton::clicked, this,
             [this] { sendCommand(Cmd::Exit); });
 
     auto* homeExitColumn = wrapColumn({home, exitBtn}, 12);
 
-    auto* ch = new RockerColumn("CH", page);
-    connect(ch, &RockerColumn::plus,  this, [this] { sendCommand(Cmd::ChannelUp);   });
-    connect(ch, &RockerColumn::minus, this, [this] { sendCommand(Cmd::ChannelDown); });
+    m_ch = new RockerColumn("CH", page);
+    connect(m_ch, &RockerColumn::plus,  this, [this] { sendCommand(Cmd::ChannelUp);   });
+    connect(m_ch, &RockerColumn::minus, this, [this] { sendCommand(Cmd::ChannelDown); });
 
     auto* topRow = new QWidget;
     auto* topLayout = new QHBoxLayout(topRow);
     topLayout->setContentsMargins(0, 0, 0, 0);
     topLayout->setSpacing(12);
-    topLayout->addWidget(vol, 1);
+    topLayout->addWidget(m_vol, 1);
     topLayout->addWidget(homeExitColumn, 12);
-    topLayout->addWidget(ch, 1);
+    topLayout->addWidget(m_ch, 1);
 
     auto makeBtn = [&](const QString& svg, const QString& lbl, Cmd cmd) -> IconButton* {
         auto* b = new IconButton(svg, lbl, page);
         b->setMinimumHeight(72);
+        m_iconByCmd.insert(static_cast<int>(cmd), b);
         connect(b, &QAbstractButton::clicked, this,
                 [this, cmd] { sendCommand(cmd); });
         return b;
@@ -176,12 +186,12 @@ QWidget* RemoteScreen::buildMainPage() {
 
     auto* midRow = wrapRow({mute, back, kbd, input}, 10);
 
-    auto* dpad = new DPad(page);
-    connect(dpad, &DPad::up,    this, [this] { sendCommand(Cmd::Up);    });
-    connect(dpad, &DPad::down,  this, [this] { sendCommand(Cmd::Down);  });
-    connect(dpad, &DPad::left,  this, [this] { sendCommand(Cmd::Left);  });
-    connect(dpad, &DPad::right, this, [this] { sendCommand(Cmd::Right); });
-    connect(dpad, &DPad::ok,    this, [this] { sendCommand(Cmd::Ok);    });
+    m_dpad = new DPad(page);
+    connect(m_dpad, &DPad::up,    this, [this] { sendCommand(Cmd::Up);    });
+    connect(m_dpad, &DPad::down,  this, [this] { sendCommand(Cmd::Down);  });
+    connect(m_dpad, &DPad::left,  this, [this] { sendCommand(Cmd::Left);  });
+    connect(m_dpad, &DPad::right, this, [this] { sendCommand(Cmd::Right); });
+    connect(m_dpad, &DPad::ok,    this, [this] { sendCommand(Cmd::Ok);    });
 
     IconButton* info = makeBtn(":/icons/info.svg", "INFO", Cmd::Info);
     info->setFixedWidth(96);
@@ -199,7 +209,7 @@ QWidget* RemoteScreen::buildMainPage() {
     layout->addWidget(powerWrap);
     layout->addWidget(topRow);
     layout->addWidget(midRow);
-    layout->addWidget(dpad, 1, Qt::AlignHCenter);
+    layout->addWidget(m_dpad, 1, Qt::AlignHCenter);
     layout->addWidget(infoWrap);
 
     return page;
@@ -214,12 +224,14 @@ QWidget* RemoteScreen::buildNumbersPage() {
     for (int i = 0; i < 9; ++i) {
         const int digit = i + 1;
         auto* key = new KeypadKey(digit, page);
+        m_keyByDigit.insert(digit, key);
         connect(key, &QAbstractButton::clicked, this,
                 [this, digit] { sendCommand(lazytv::Client::digit(digit)); });
         grid->addWidget(key, i / 3, i % 3);
     }
 
     auto* zero = new KeypadKey(0, page);
+    m_keyByDigit.insert(0, zero);
     connect(zero, &QAbstractButton::clicked, this,
             [this] { sendCommand(lazytv::Client::digit(0)); });
     grid->addWidget(zero, 3, 1);
@@ -230,6 +242,52 @@ QWidget* RemoteScreen::buildNumbersPage() {
     grid->addWidget(backKey, 3, 2);
 
     return page;
+}
+
+void RemoteScreen::flashButton(Cmd cmd) {
+    const int id = static_cast<int>(cmd);
+
+    // Цифры: Number0..Number9 → KeypadKey с digit 0..9.
+    if (cmd >= Cmd::Number0 && cmd <= Cmd::Number9) {
+        if (auto* key = m_keyByDigit.value(id - static_cast<int>(Cmd::Number0))) {
+            key->setFlash(true);
+            QTimer::singleShot(kFlashMs, key, [key] { key->setFlash(false); });
+        }
+        return;
+    }
+
+    if (auto* btn = m_iconByCmd.value(id)) {
+        btn->setFlash(true);
+        QTimer::singleShot(kFlashMs, btn, [btn] { btn->setFlash(false); });
+        return;
+    }
+
+    if (!m_dpad || !m_vol || !m_ch)
+        return;
+
+    switch (cmd) {
+        case Cmd::Up:    m_dpad->flash(DPad::Part::Up, kFlashMs);    break;
+        case Cmd::Down:  m_dpad->flash(DPad::Part::Down, kFlashMs);  break;
+        case Cmd::Left:  m_dpad->flash(DPad::Part::Left, kFlashMs);  break;
+        case Cmd::Right: m_dpad->flash(DPad::Part::Right, kFlashMs); break;
+        case Cmd::Ok:    m_dpad->flash(DPad::Part::Center, kFlashMs); break;
+
+        case Cmd::VolumeUp:
+            m_vol->flash(RockerColumn::Half::Plus, kFlashMs);
+            break;
+        case Cmd::VolumeDown:
+            m_vol->flash(RockerColumn::Half::Minus, kFlashMs);
+            break;
+        case Cmd::ChannelUp:
+            m_ch->flash(RockerColumn::Half::Plus, kFlashMs);
+            break;
+        case Cmd::ChannelDown:
+            m_ch->flash(RockerColumn::Half::Minus, kFlashMs);
+            break;
+
+        default:
+            break;
+    }
 }
 
 void RemoteScreen::sendCommand(Cmd cmd) {

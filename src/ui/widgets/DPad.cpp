@@ -7,8 +7,20 @@
 
 DPad::DPad(QWidget *parent) : QWidget(parent) {
   setMinimumSize(200, 200);
+  m_flashTimer.setSingleShot(true);
+  connect(&m_flashTimer, &QTimer::timeout, this, [this]() {
+    m_flashOn = false;
+    update();
+  });
   connect(&ThemeManager::instance(), &ThemeManager::changed, this,
           qOverload<>(&QWidget::update));
+}
+
+void DPad::flash(Part part, int ms) {
+  m_flashPart = part;
+  m_flashOn = true;
+  update();
+  m_flashTimer.start(ms);
 }
 
 void DPad::recompute() {
@@ -40,23 +52,43 @@ void DPad::paintEvent(QPaintEvent *) {
   // Треугольники
   const QSize ts(18, 18);
   const QPixmap pm = tintedSvg(":/icons/triangle.svg", p.onSurface, ts);
+  const QPixmap pmLit = tintedSvg(":/icons/triangle.svg", p.onPrimary, ts);
 
-  auto drawTriangle = [&](const QRectF &box, qreal angle) {
+  auto drawTriangle = [&](const QRectF &box, qreal angle, bool lit) {
+    if (lit) {
+      g.setBrush(p.primary);
+      g.setPen(Qt::NoPen);
+      g.drawEllipse(box.center(), box.width() * 0.55, box.height() * 0.55);
+    }
     g.save();
     g.translate(box.center());
     g.rotate(angle);
-    g.drawPixmap(-ts.width() / 2, -ts.height() / 2, pm);
+    const QPixmap &icon = lit ? pmLit : pm;
+    g.drawPixmap(-ts.width() / 2, -ts.height() / 2, icon);
     g.restore();
   };
 
-  drawTriangle(m_up, 0);
-  drawTriangle(m_right, 90);
-  drawTriangle(m_down, 180);
-  drawTriangle(m_left, 270);
+  const bool litUp    = m_flashOn && m_flashPart == Part::Up;
+  const bool litDown  = m_flashOn && m_flashPart == Part::Down;
+  const bool litLeft  = m_flashOn && m_flashPart == Part::Left;
+  const bool litRight = m_flashOn && m_flashPart == Part::Right;
+  const bool litOk    = m_flashOn && m_flashPart == Part::Center;
 
-  // Центральная точка
-  g.setBrush(p.onSurface);
+  drawTriangle(m_up, 0, litUp);
+  drawTriangle(m_right, 90, litRight);
+  drawTriangle(m_down, 180, litDown);
+  drawTriangle(m_left, 270, litLeft);
+
+  // Центральная точка: при подсветке «нажимается» — точка вырастает.
   g.setPen(Qt::NoPen);
+  if (litOk) {
+    g.setBrush(p.primary);
+    g.drawEllipse(m_center.center(), m_center.width() * 0.95,
+                  m_center.height() * 0.95);
+    g.setBrush(p.onPrimary);
+  } else {
+    g.setBrush(p.onSurface);
+  }
   g.drawEllipse(m_center);
 }
 

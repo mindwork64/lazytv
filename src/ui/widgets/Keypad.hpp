@@ -9,9 +9,13 @@ public:
 
   QSize sizeHint() const override { return {80, 64}; }
 
+  /** Подсветка от горячей клавиши (цифры). */
+  void setFlash(bool v);
+
 protected:
   void paintEvent(QPaintEvent *) override;
 
 private:
   int m_digit;
+  bool m_flash = false;
 };
