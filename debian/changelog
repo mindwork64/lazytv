@@ -1,3 +1,20 @@
+lazytv (1.1.2-1) noble; urgency=medium
+
+  * Keyboard hotkeys on the remote screen: arrows, Enter/Space (OK),
+    Esc (BACK), Backspace (EXIT), P, M, H, I, +/- for volume,
+    PageUp/PageDown for channels, digits 0-9 (main row and numpad),
+    Tab switches between the main and numeric pages.
+  * Hotkeys flash the matching on-screen button; auto-repeat is allowed
+    only for arrows, volume and channel and is capped by the client
+    command interval, so a held key cannot flood the TV. Ctrl/Alt/Meta
+    combinations are not intercepted.
+  * New "Hotkeys" toggle in settings, stored as hotkeysEnabled in
+    ~/.config/lazytv/config.json (enabled by default).
+  * Updated application icon: simpler shape, better legibility at
+    small sizes.
+  * Docs: keyboard hotkeys section in README and release notes 1.1.2.
+
+ -- mindwork64 <vmurashov85@gmail.com>  Sun, 27 Sep 2026 15:30:00 +0300
 lazytv (1.1.1-1) noble; urgency=medium
 
   * Read the HTTP response body by Content-Length instead of waiting for
