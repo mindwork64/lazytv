@@ -30,7 +30,6 @@
   без использования торговой марки LG.
 - CMake-цели: `LazyTV::Core`, `LazyTV::Client`; заголовки
   `#include <lazytv/...>`; конфиг `~/.config/lazytv/`.
-- Флаг `--version` печатает версию, взятую из `CMakeLists.txt`.
 
 ### 📦 Установка
 
