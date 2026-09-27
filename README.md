@@ -382,33 +382,22 @@ target_link_libraries(my_remote PRIVATE LazyTV::Core)
 
 ## Сборка PPA-пакета (для разработчиков)
 
-Если хотите собрать `.deb` самостоятельно:
+Если хотите собрать `.deb` самостоятельно — используйте скрипт
+(проверки и порядок шагов описаны в его комментариях):
 
 ```bash
-# Создать рабочую копию с правильным именем папки
-cd ~/apps
-mkdir -p lazytv-1.1.0
-cd lazytv
-git archive --format=tar --prefix=lazytv-1.1.0/ HEAD \
-    | tar -x -C ~/apps/
-
-# Orig-архив без debian/
-cd ~/apps
-tar -czf lazytv_1.1.0.orig.tar.gz \
-    --exclude='lazytv-1.1.0/debian' \
-    lazytv-1.1.0/
-
-# Source-пакет
-cd ~/apps/lazytv-1.1.0
-chmod +x debian/rules
-rm -f debian/files
-debuild -S -sa -k<ваш-GPG-key-id>
-
-# Проверка и загрузка
-cd ~/apps
-lintian lazytv_1.1.0-1_source.changes
-dput lazytv lazytv_1.1.0-1_source.changes
+cd ~/apps/lazytv
+scripts/release-ppa.sh 1.1.1     # версия должна быть уже поднята
 ```
+
+Скрипт требует чистого рабочего дерева и тега `v1.1.1` на `HEAD`,
+проверяет синхронность версий в `CMakeLists.txt` и `debian/changelog`,
+`orig.tar.gz` без `debian/`, перевод строки в `debian/*`, запускает
+`lintian --fail-on error` и только после этого `dput`.
+
+Вручную — те же шаги: `git archive HEAD` → `orig.tar.gz` без `debian/` →
+`debuild -S -sa -k<GPG-key-id>` → `lintian` → `dput lazytv …`.
+Все артефакты появляются в `~/apps/`.
 
 Структура `debian/`:
 
