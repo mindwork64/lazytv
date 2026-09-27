@@ -387,10 +387,10 @@ target_link_libraries(my_remote PRIVATE LazyTV::Core)
 
 ```bash
 cd ~/apps/lazytv
-scripts/release-ppa.sh 1.1.1     # версия должна быть уже поднята
+scripts/release-ppa.sh X.Y.Z     # версия должна быть уже поднята
 ```
 
-Скрипт требует чистого рабочего дерева и тега `v1.1.1` на `HEAD`,
+Скрипт требует чистого рабочего дерева и тега `vX.Y.Z` на `HEAD`,
 проверяет синхронность версий в `CMakeLists.txt` и `debian/changelog`,
 `orig.tar.gz` без `debian/`, перевод строки в `debian/*`, запускает
 `lintian --fail-on error` и только после этого `dput`.

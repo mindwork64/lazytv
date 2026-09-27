@@ -8,7 +8,7 @@
 # и чистое рабочее дерево.
 #
 # Использование:
-#   scripts/release-ppa.sh 1.1.1
+#   scripts/release-ppa.sh X.Y.Z
 #
 # Для проверки самого скрипта каталоги можно переопределить:
 #   LAZYTV_SRC_DIR=/tmp/sbx/apps/lazytv LAZYTV_APPS_DIR=/tmp/sbx/apps
@@ -25,7 +25,7 @@ WORK_DIR="$APPS_DIR/lazytv-${VERSION}"
 die() { echo "ОШИБКА: $*" >&2; exit 1; }
 step() { echo; echo "==> $*"; }
 
-[[ -n "$VERSION" ]] || die "укажите версию: scripts/release-ppa.sh 1.1.1"
+[[ -n "$VERSION" ]] || die "укажите версию: scripts/release-ppa.sh X.Y.Z"
 [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] \
     || die "версия должна быть в формате X.Y.Z (получено: '$VERSION')"
 

@@ -11,7 +11,7 @@ pipeline {
         string(
             name: 'VERSION',
             defaultValue: '',
-            description: 'Версия (например 1.1.1). Должна совпадать с CMakeLists.txt и debian/changelog.'
+            description: 'Версия в формате X.Y.Z (например 1.1.2). Должна совпадать с CMakeLists.txt и debian/changelog.'
         )
         string(
             name: 'GIT_REF',
