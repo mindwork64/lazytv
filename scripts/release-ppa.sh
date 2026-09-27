@@ -10,13 +10,16 @@
 # Использование:
 #   scripts/release-ppa.sh 1.1.1
 #
+# Для проверки самого скрипта каталоги можно переопределить:
+#   LAZYTV_SRC_DIR=/tmp/sbx/apps/lazytv LAZYTV_APPS_DIR=/tmp/sbx/apps
+#
 set -euo pipefail
 
 VERSION="${1:-}"
 GPG_KEY="8A0110A813660BBB16A0D243128E73EB1731C57C"
 PPA="lazytv"
-SRC_DIR="$HOME/apps/lazytv"
-APPS_DIR="$HOME/apps"
+SRC_DIR="${LAZYTV_SRC_DIR:-$HOME/apps/lazytv}"
+APPS_DIR="${LAZYTV_APPS_DIR:-$HOME/apps}"
 WORK_DIR="$APPS_DIR/lazytv-${VERSION}"
 
 die() { echo "ОШИБКА: $*" >&2; exit 1; }
