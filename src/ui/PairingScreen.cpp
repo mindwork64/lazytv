@@ -135,10 +135,13 @@ void PairingScreen::confirm() {
 
     m_activeClient = m_container->createClient(ip);
     connect(m_activeClient, &lazytv::Client::pairingConfirmResult, this,
-            [this, ip](const lazytv::Client::PairingResult& r) {
+            [this, ip, key](const lazytv::Client::PairingResult& r) {
         setLoading(false);
 
         if (!r.session.isEmpty()) {
+            // Ключ сопряжения — долговременный: по нему при следующем
+            // запуске молча получаем свежую сессию.
+            m_container->store().setPairingKey(key);
             m_container->saveSession(ip, r.session);
             emit connected();
             return;

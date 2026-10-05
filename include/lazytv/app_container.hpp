@@ -1,6 +1,7 @@
 #pragma once
 
 #include <QString>
+#include <functional>
 #include <memory>
 
 #include <lazytv/lazytv_export.h>
@@ -40,6 +41,19 @@ public:
 
   /** Сохраняет сессию и делает клиент активным. */
   void saveSession(const QString &ip, const QString &session);
+
+  /** Есть ли сохранённые IP и ключ сопряжения (можно восстановиться без PIN). */
+  bool hasSavedPairing() const;
+
+  /**
+   * Тихое восстановление сессии: повторный AuthReq по сохранённому ключу
+   * сопряжения. При успехе обновляет сессию в хранилище; если ТВ отверг
+   * ключ (ROAPError/HTTP 401) — очищает сохранённое сопряжение.
+   *
+   * @param cb cb(ok, rejected): ok — получена свежая сессия;
+   *           rejected — ТВ отверг ключ (нужен новый PIN).
+   */
+  void reauth(std::function<void(bool ok, bool rejected)> cb);
 
   void clearSession();
 
