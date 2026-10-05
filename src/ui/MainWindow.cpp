@@ -32,8 +32,17 @@ MainWindow::MainWindow(lazytv::AppContainer *container)
           [this] { showScreen(Remote); });
   connect(m_remote, &RemoteScreen::openSettings, this,
           [this] { showScreen(Settings); });
-  connect(m_remote, &RemoteScreen::disconnected, this,
-          [this] { showScreen(Pairing); });
+  connect(m_remote, &RemoteScreen::disconnected, this, [this] {
+    // Сессия истекла у ТВ: пробуем молча переаутентифицироваться
+    // сохранённым ключом сопряжения, иначе — на экран сопряжения.
+    if (m_container->hasSavedPairing()) {
+      m_container->reauth([this](bool ok, bool) {
+        showScreen(ok ? Remote : Pairing);
+      });
+    } else {
+      showScreen(Pairing);
+    }
+  });
   connect(m_settings, &SettingsScreen::back, this,
           [this] { showScreen(Remote); });
   connect(m_settings, &SettingsScreen::disconnect, this, [this] {
@@ -50,7 +59,21 @@ MainWindow::MainWindow(lazytv::AppContainer *container)
             m_remote->setHotkeysEnabled(v);
           });
 
-  showScreen(container->store().session() ? Remote : Pairing);
+  if (container->store().session() && container->store().pairingKey()) {
+    // Сессия есть — сразу пульт; параллельно молча обновляем её по ключу,
+    // чтобы не зависеть от того, жива ли сохранённая сессия у ТВ.
+    showScreen(Remote);
+    m_container->reauth([this](bool, bool rejected) {
+      if (rejected) showScreen(Pairing);
+    });
+  } else if (container->store().pairingKey()) {
+    // Сессии нет, но ключ сопряжения сохранён — восстанавливаемся им.
+    m_container->reauth([this](bool ok, bool) {
+      showScreen(ok ? Remote : Pairing);
+    });
+  } else {
+    showScreen(Pairing);
+  }
 }
 
 void MainWindow::showScreen(Screen s) {

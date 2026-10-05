@@ -29,6 +29,8 @@ void SessionStore::load() {
     m_ip = o["ip"].toString();
   if (o.contains("session") && !o["session"].isNull())
     m_session = o["session"].toString();
+  if (o.contains("pairingKey") && !o["pairingKey"].isNull())
+    m_pairingKey = o["pairingKey"].toString();
   m_themeMode = o.value("themeMode").toInt(1);
   m_hotkeysEnabled = o.value("hotkeysEnabled").toBool(true);
 }
@@ -37,6 +39,7 @@ void SessionStore::save() {
   QJsonObject o;
   o["ip"] = m_ip ? QJsonValue(*m_ip) : QJsonValue::Null;
   o["session"] = m_session ? QJsonValue(*m_session) : QJsonValue::Null;
+  o["pairingKey"] = m_pairingKey ? QJsonValue(*m_pairingKey) : QJsonValue::Null;
   o["themeMode"] = m_themeMode;
   o["hotkeysEnabled"] = m_hotkeysEnabled;
 
@@ -56,6 +59,11 @@ void SessionStore::setSession(const QString &s) {
   save();
 }
 
+void SessionStore::setPairingKey(const QString &key) {
+  m_pairingKey = key;
+  save();
+}
+
 void SessionStore::setThemeMode(int m) {
   m_themeMode = m;
   save();
@@ -68,12 +76,14 @@ void SessionStore::setHotkeysEnabled(bool v) {
 
 void SessionStore::clearSession() {
   m_session.reset();
+  m_pairingKey.reset();
   save();
 }
 
 void SessionStore::clearAll() {
   m_ip.reset();
   m_session.reset();
+  m_pairingKey.reset();
   m_themeMode = 1;
   m_hotkeysEnabled = true;
   save();

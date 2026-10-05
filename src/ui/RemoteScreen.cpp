@@ -307,6 +307,8 @@ void RemoteScreen::sendCommand(Cmd cmd) {
     }
     connect(client, &lazytv::Client::commandResult,
             this, &RemoteScreen::onCommandResult, Qt::UniqueConnection);
+    connect(client, &lazytv::Client::sessionExpired,
+            this, &RemoteScreen::disconnected, Qt::UniqueConnection);
     client->sendCommand(cmd);
 }
 
