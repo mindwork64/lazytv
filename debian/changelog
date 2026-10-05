@@ -1,3 +1,16 @@
+lazytv (1.1.3-1) noble; urgency=medium
+
+  * Restore the saved session on every start by the pairing key: the
+    client now stores the 6-digit pairing key and re-runs AuthReq,
+    so the PIN is only needed for the initial pairing (GitHub #4).
+  * Re-authenticate silently on HTTP 401 instead of always forcing
+    re-pairing; the pairing key is cleared only when the TV actually
+    rejects it, not on a transient network error (TV off/unreachable).
+  * SessionStore: new pairingKey field, wiped by "forget session".
+  * Docs: README config section and ADR-020; release notes 1.1.3.
+
+ -- mindwork64 <vmurashov85@gmail.com>  Mon, 05 Oct 2026 09:30:00 +0300
+
 lazytv (1.1.2-1) noble; urgency=medium
 
   * Keyboard hotkeys on the remote screen: arrows, Enter/Space (OK),
