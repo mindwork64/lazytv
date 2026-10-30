@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.21)
-project(lazytv VERSION 1.1.3 LANGUAGES CXX)
+project(lazytv VERSION 1.2.0 LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -74,6 +74,7 @@ qt_add_executable(lazytv-app
     src/ui/HotkeyHandler.cpp
     src/ui/widgets/IconButton.cpp
     src/ui/widgets/StatusBar.cpp
+    src/ui/widgets/NowPlayingBar.cpp
     src/ui/widgets/DPad.cpp
     src/ui/widgets/RockerColumn.cpp
     src/ui/widgets/Keypad.cpp

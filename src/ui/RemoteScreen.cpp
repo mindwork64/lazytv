@@ -1,10 +1,16 @@
 #include "ui/RemoteScreen.hpp"
 
+#include <QAction>
 #include <QDateTime>
 #include <QGridLayout>
 #include <QHBoxLayout>
+#include <QHideEvent>
 #include <QKeyEvent>
 #include <QLabel>
+#include <QListWidget>
+#include <QMenu>
+#include <QPushButton>
+#include <QResizeEvent>
 #include <QShowEvent>
 #include <QStackedWidget>
 #include <QTimer>
@@ -18,6 +24,7 @@
 #include "ui/widgets/DPad.hpp"
 #include "ui/widgets/IconButton.hpp"
 #include "ui/widgets/Keypad.hpp"
+#include "ui/widgets/NowPlayingBar.hpp"
 #include "ui/widgets/RockerColumn.hpp"
 
 using Cmd = lazytv::Client::Command;
@@ -26,6 +33,29 @@ namespace {
 
 /** Длительность подсветки кнопки при нажатии горячей клавиши, мс. */
 constexpr int kFlashMs = 120;
+
+/** Страницы QStackedWidget. */
+constexpr int kMainPage = 0;
+constexpr int kNumbersPage = 1;
+constexpr int kChannelsPage = 2;
+constexpr int kScreenPage = 3;
+
+/** Период фонового опроса состояния ТВ, мс. */
+constexpr int kInfoPollMs = 5'000;
+
+/** Пауза после команды перед внеочередным опросом, мс. */
+constexpr int kRefreshAfterChannelMs = 700;
+constexpr int kRefreshAfterVolumeMs = 500;
+constexpr int kRefreshAfterPowerMs = 1'500;
+constexpr int kRefreshAfterDigitMs = 1'200;
+constexpr int kRefreshAfterInputMs = 700;
+
+QString shortError(int httpStatus) {
+    return httpStatus == 0
+               ? QStringLiteral("Телевизор не отвечает")
+               : QStringLiteral("Ошибка телевизора (HTTP %1)")
+                     .arg(httpStatus);
+}
 
 QWidget* wrapColumn(std::initializer_list<QWidget*> widgets, int spacing = 14) {
     auto* w = new QWidget;
@@ -62,9 +92,16 @@ RemoteScreen::RemoteScreen(lazytv::AppContainer* container, QWidget* parent)
             this, &RemoteScreen::openSettings);
     root->addWidget(m_statusBar);
 
+    m_nowPlaying = new NowPlayingBar(this);
+    connect(m_nowPlaying, &NowPlayingBar::menuRequested,
+            this, &RemoteScreen::showMoreMenu);
+    root->addWidget(m_nowPlaying);
+
     m_pages = new QStackedWidget(this);
     m_pages->addWidget(buildMainPage());
     m_pages->addWidget(buildNumbersPage());
+    m_pages->addWidget(buildChannelsPage());
+    m_pages->addWidget(buildScreenPage());
     root->addWidget(m_pages, 1);
 
     m_hotkeys = new HotkeyHandler(this);
@@ -75,7 +112,9 @@ RemoteScreen::RemoteScreen(lazytv::AppContainer* container, QWidget* parent)
                 sendCommand(cmd);
             });
     connect(m_hotkeys, &HotkeyHandler::switchPage, this, [this] {
-        m_pages->setCurrentIndex(m_pages->currentIndex() == 0 ? 1 : 0);
+        m_pages->setCurrentIndex(m_pages->currentIndex() == kMainPage
+                                     ? kNumbersPage
+                                     : kMainPage);
     });
 
     m_errorBanner = new QLabel(this);
@@ -89,6 +128,17 @@ RemoteScreen::RemoteScreen(lazytv::AppContainer* container, QWidget* parent)
             this, &RemoteScreen::recomputeStatus);
     m_statusTimer->start();
 
+    // Опрос состояния идёт только пока пульт виден (см. showEvent/hideEvent).
+    m_infoTimer = new QTimer(this);
+    m_infoTimer->setInterval(kInfoPollMs);
+    connect(m_infoTimer, &QTimer::timeout,
+            this, &RemoteScreen::refreshInfo);
+
+    m_refreshTimer = new QTimer(this);
+    m_refreshTimer->setSingleShot(true);
+    connect(m_refreshTimer, &QTimer::timeout,
+            this, &RemoteScreen::refreshInfo);
+
     connect(&ThemeManager::instance(), &ThemeManager::changed, this, [this]() {
         m_statusBar->update();
         updateErrorBannerStyle();
@@ -96,8 +146,7 @@ RemoteScreen::RemoteScreen(lazytv::AppContainer* container, QWidget* parent)
 
     // Если клиент создан и ТВ отверг сессию — переключаемся на сопряжение.
     if (auto* client = m_container->getClient()) {
-        connect(client, &lazytv::Client::sessionExpired, this,
-                &RemoteScreen::disconnected);
+        connectClientSignals(client);
     }
 }
 
@@ -110,6 +159,26 @@ void RemoteScreen::showEvent(QShowEvent* /*event*/) {
     // Без явного фокуса после возврата из «Настройки» клавиши
     // уходят экрану настроек, а не пульту.
     setFocus(Qt::OtherFocusReason);
+
+    m_infoTimer->start();
+    refreshInfo();
+
+    if (m_pages->currentIndex() == kChannelsPage)
+        refreshChannelList();
+    else if (m_pages->currentIndex() == kScreenPage)
+        refreshScreenImage();
+}
+
+void RemoteScreen::hideEvent(QHideEvent* event) {
+    QWidget::hideEvent(event);
+    if (m_infoTimer) m_infoTimer->stop();
+    if (m_refreshTimer) m_refreshTimer->stop();
+}
+
+void RemoteScreen::resizeEvent(QResizeEvent* event) {
+    QWidget::resizeEvent(event);
+    if (m_pages && m_pages->currentIndex() == kScreenPage)
+        updateScreenImage();
 }
 
 void RemoteScreen::setHotkeysEnabled(bool v) {
@@ -185,7 +254,7 @@ QWidget* RemoteScreen::buildMainPage() {
     IconButton* kbd = new IconButton(":/icons/kbd.svg", "KBD", page);
     kbd->setMinimumHeight(72);
     connect(kbd, &QAbstractButton::clicked, this,
-            [this] { m_pages->setCurrentIndex(1); });
+            [this] { m_pages->setCurrentIndex(kNumbersPage); });
 
     IconButton* input = makeBtn(":/icons/input.svg", "INPUT", Cmd::ExternalInput);
 
@@ -243,8 +312,123 @@ QWidget* RemoteScreen::buildNumbersPage() {
 
     auto* backKey = new KeypadKey(-1, page);
     connect(backKey, &QAbstractButton::clicked, this,
-            [this] { m_pages->setCurrentIndex(0); });
+            [this] { m_pages->setCurrentIndex(kMainPage); });
     grid->addWidget(backKey, 3, 2);
+
+    return page;
+}
+
+QWidget* RemoteScreen::buildChannelsPage() {
+    auto* page = new QWidget;
+    auto* layout = new QVBoxLayout(page);
+    layout->setContentsMargins(0, 0, 0, 0);
+    layout->setSpacing(10);
+
+    auto* header = new QHBoxLayout;
+    header->setContentsMargins(0, 0, 0, 0);
+    header->setSpacing(10);
+
+    auto* back = new QPushButton(QStringLiteral("← Назад"), page);
+    back->setFocusPolicy(Qt::NoFocus);
+    back->setCursor(Qt::PointingHandCursor);
+    connect(back, &QPushButton::clicked, this,
+            [this] { m_pages->setCurrentIndex(kMainPage); });
+
+    auto* title = new QLabel(QStringLiteral("Каналы"), page);
+    QFont titleFont = title->font();
+    titleFont.setPointSizeF(13.0);
+    titleFont.setBold(true);
+    title->setFont(titleFont);
+
+    m_channelRefresh = new QPushButton(QStringLiteral("Обновить"), page);
+    m_channelRefresh->setFocusPolicy(Qt::NoFocus);
+    m_channelRefresh->setCursor(Qt::PointingHandCursor);
+    connect(m_channelRefresh, &QPushButton::clicked,
+            this, &RemoteScreen::refreshChannelList);
+
+    header->addWidget(back);
+    header->addWidget(title, 1);
+    header->addWidget(m_channelRefresh);
+    layout->addLayout(header);
+
+    m_channelListHint = new QLabel(QStringLiteral("Загрузка списка каналов…"),
+                                   page);
+    m_channelListHint->setAlignment(Qt::AlignCenter);
+    m_channelListHint->setWordWrap(true);
+    layout->addWidget(m_channelListHint);
+
+    m_channelList = new QListWidget(page);
+    m_channelList->setFocusPolicy(Qt::NoFocus);
+    m_channelList->setAlternatingRowColors(true);
+    m_channelList->setUniformItemSizes(true);
+    m_channelList->setSelectionMode(QAbstractItemView::SingleSelection);
+    m_channelList->setVisible(false);
+    connect(m_channelList, &QListWidget::itemClicked, this,
+            [this](QListWidgetItem* item) {
+        if (!item) return;
+        const int index = item->data(Qt::UserRole).toInt();
+        if (index < 0 || index >= m_channels.size()) return;
+
+        auto* client = m_container->getClient();
+        if (!client) return;
+        connectClientSignals(client);
+        client->changeChannel(m_channels.at(index));
+        m_pages->setCurrentIndex(kMainPage);
+        scheduleInfoRefresh(kRefreshAfterChannelMs);
+    });
+    layout->addWidget(m_channelList, 1);
+
+    return page;
+}
+
+QWidget* RemoteScreen::buildScreenPage() {
+    auto* page = new QWidget;
+    auto* layout = new QVBoxLayout(page);
+    layout->setContentsMargins(0, 0, 0, 0);
+    layout->setSpacing(10);
+
+    auto* header = new QHBoxLayout;
+    header->setContentsMargins(0, 0, 0, 0);
+    header->setSpacing(10);
+
+    auto* back = new QPushButton(QStringLiteral("← Назад"), page);
+    back->setFocusPolicy(Qt::NoFocus);
+    back->setCursor(Qt::PointingHandCursor);
+    connect(back, &QPushButton::clicked, this,
+            [this] { m_pages->setCurrentIndex(kMainPage); });
+
+    auto* title = new QLabel(QStringLiteral("Экран ТВ"), page);
+    QFont titleFont = title->font();
+    titleFont.setPointSizeF(13.0);
+    titleFont.setBold(true);
+    title->setFont(titleFont);
+
+    m_screenRefresh = new QPushButton(QStringLiteral("Обновить"), page);
+    m_screenRefresh->setFocusPolicy(Qt::NoFocus);
+    m_screenRefresh->setCursor(Qt::PointingHandCursor);
+    connect(m_screenRefresh, &QPushButton::clicked,
+            this, &RemoteScreen::refreshScreenImage);
+
+    header->addWidget(back);
+    header->addWidget(title, 1);
+    header->addWidget(m_screenRefresh);
+    layout->addLayout(header);
+
+    m_screenImage = new QLabel(page);
+    m_screenImage->setAlignment(Qt::AlignCenter);
+    m_screenImage->setMinimumSize(320, 180);
+    m_screenImage->setSizePolicy(QSizePolicy::Expanding,
+                                 QSizePolicy::Expanding);
+    m_screenImage->setStyleSheet(
+        QStringLiteral("QLabel { background-color: #000000; "
+                       "border-radius: 8px; }"));
+    layout->addWidget(m_screenImage, 1);
+
+    m_screenHint = new QLabel(
+        QStringLiteral("Нажмите «Обновить», чтобы получить кадр"), page);
+    m_screenHint->setAlignment(Qt::AlignCenter);
+    m_screenHint->setWordWrap(true);
+    layout->addWidget(m_screenHint);
 
     return page;
 }
@@ -295,6 +479,180 @@ void RemoteScreen::flashButton(Cmd cmd) {
     }
 }
 
+void RemoteScreen::connectClientSignals(lazytv::Client* client) {
+    if (!client || client == m_connectedClient) return;
+
+    m_connectedClient = client;
+
+    // Указатель нужен, чтобы после пересопряжения подключиться к новому
+    // клиенту; Qt сам отключает сигналы при удалении клиента.
+    connect(client, &QObject::destroyed, this, [this, client] {
+        if (m_connectedClient == client)
+            m_connectedClient = nullptr;
+    });
+
+    connect(client, &lazytv::Client::commandResult,
+            this, &RemoteScreen::onCommandResult);
+    connect(client, &lazytv::Client::sessionExpired,
+            this, &RemoteScreen::disconnected);
+
+    connect(client, &lazytv::Client::currentChannelResult, this,
+            [this](const lazytv::ChannelInfo& channel) {
+        m_nowPlaying->setChannel(channel);
+    });
+
+    connect(client, &lazytv::Client::volumeInfoResult, this,
+            [this](const lazytv::VolumeInfo& volume) {
+        m_nowPlaying->setVolume(volume);
+    });
+
+    connect(client, &lazytv::Client::channelListResult, this,
+            [this](const QVector<lazytv::ChannelInfo>& channels) {
+        m_channels = channels;
+        m_channelList->clear();
+
+        for (int i = 0; i < m_channels.size(); ++i) {
+            const auto& channel = m_channels.at(i);
+            QString text = channel.number();
+            const QString name = channel.name();
+            if (!name.isEmpty())
+                text += (text.isEmpty() ? QString() : QStringLiteral("  "))
+                        + name;
+            if (text.isEmpty())
+                text = QStringLiteral("Без названия");
+
+            auto* item = new QListWidgetItem(text, m_channelList);
+            item->setData(Qt::UserRole, i);
+        }
+
+        const bool empty = m_channels.isEmpty();
+        m_channelList->setVisible(!empty);
+        m_channelListHint->setText(
+            empty ? QStringLiteral("Список каналов пуст")
+                  : QString());
+        m_channelListHint->setVisible(empty);
+    });
+
+    connect(client, &lazytv::Client::screenImageResult, this,
+            [this](const QByteArray& jpeg) {
+        QPixmap pixmap;
+        if (!pixmap.loadFromData(jpeg)) {
+            m_screenHint->setText(QStringLiteral("Не удалось декодировать кадр"));
+            m_screenHint->setVisible(true);
+            return;
+        }
+        m_screenPixmap = pixmap;
+        m_screenHint->setVisible(false);
+        updateScreenImage();
+    });
+
+    connect(client, &lazytv::Client::queryFailed, this,
+            [this](lazytv::Client::Query query, int httpStatus) {
+        if (query == lazytv::Client::Query::ChannelList) {
+            m_channelListHint->setText(
+                QStringLiteral("Не удалось получить список каналов: %1")
+                    .arg(shortError(httpStatus)));
+            m_channelListHint->setVisible(true);
+        } else if (query == lazytv::Client::Query::ScreenImage) {
+            m_screenHint->setText(
+                QStringLiteral("Не удалось получить кадр: %1")
+                    .arg(shortError(httpStatus)));
+            m_screenHint->setVisible(true);
+        }
+    });
+}
+
+void RemoteScreen::refreshInfo() {
+    auto* client = m_container->getClient();
+    if (!client) {
+        m_nowPlaying->setUnavailable(QStringLiteral("Сессия не установлена"));
+        return;
+    }
+
+    connectClientSignals(client);
+    client->requestCurrentChannel();
+    client->requestVolumeInfo();
+}
+
+void RemoteScreen::scheduleInfoRefresh(int delayMs) {
+    // Внеочередной опрос имеет смысл только пока пульт виден.
+    if (!m_infoTimer->isActive()) return;
+    m_refreshTimer->start(delayMs);
+}
+
+void RemoteScreen::refreshChannelList() {
+    auto* client = m_container->getClient();
+    if (!client) {
+        m_channelListHint->setText(QStringLiteral("Сессия не установлена"));
+        m_channelListHint->setVisible(true);
+        return;
+    }
+
+    connectClientSignals(client);
+    if (m_channels.isEmpty()) {
+        m_channelListHint->setText(
+            QStringLiteral("Загрузка списка каналов…"));
+        m_channelListHint->setVisible(true);
+    }
+    client->requestChannelList();
+}
+
+void RemoteScreen::refreshScreenImage() {
+    auto* client = m_container->getClient();
+    if (!client) {
+        m_screenHint->setText(QStringLiteral("Сессия не установлена"));
+        m_screenHint->setVisible(true);
+        return;
+    }
+
+    connectClientSignals(client);
+    m_screenHint->setText(QStringLiteral("Загрузка кадра…"));
+    m_screenHint->setVisible(true);
+    client->requestScreenImage();
+}
+
+void RemoteScreen::updateScreenImage() {
+    if (!m_screenImage || m_screenPixmap.isNull()) return;
+
+    const QSize target = m_screenImage->size();
+    if (target.isEmpty()) return;
+
+    m_screenImage->setPixmap(m_screenPixmap.scaled(
+        target, Qt::KeepAspectRatio, Qt::SmoothTransformation));
+}
+
+void RemoteScreen::openChannelsPage() {
+    m_pages->setCurrentIndex(kChannelsPage);
+    refreshChannelList();
+}
+
+void RemoteScreen::openScreenPage() {
+    m_pages->setCurrentIndex(kScreenPage);
+    updateScreenImage();
+    refreshScreenImage();
+}
+
+void RemoteScreen::showMoreMenu(const QPoint& globalPos) {
+    QMenu menu(this);
+    QAction* channels = menu.addAction(QStringLiteral("Каналы"));
+    QAction* screen = menu.addAction(QStringLiteral("Экран ТВ"));
+    menu.addSeparator();
+    QAction* refresh = menu.addAction(QStringLiteral("Обновить"));
+
+    QAction* chosen = menu.exec(globalPos);
+    if (chosen == channels) {
+        openChannelsPage();
+    } else if (chosen == screen) {
+        openScreenPage();
+    } else if (chosen == refresh) {
+        refreshInfo();
+        if (m_pages->currentIndex() == kChannelsPage)
+            refreshChannelList();
+        else if (m_pages->currentIndex() == kScreenPage)
+            refreshScreenImage();
+    }
+}
+
 void RemoteScreen::sendCommand(Cmd cmd) {
     auto* client = m_container->getClient();
     if (!client) {
@@ -305,11 +663,38 @@ void RemoteScreen::sendCommand(Cmd cmd) {
         recomputeStatus();
         return;
     }
-    connect(client, &lazytv::Client::commandResult,
-            this, &RemoteScreen::onCommandResult, Qt::UniqueConnection);
-    connect(client, &lazytv::Client::sessionExpired,
-            this, &RemoteScreen::disconnected, Qt::UniqueConnection);
+
+    connectClientSignals(client);
     client->sendCommand(cmd);
+
+    switch (cmd) {
+        case Cmd::VolumeUp:
+        case Cmd::VolumeDown:
+        case Cmd::MuteToggle:
+            scheduleInfoRefresh(kRefreshAfterVolumeMs);
+            break;
+
+        case Cmd::ChannelUp:
+        case Cmd::ChannelDown:
+        case Cmd::PreviousChannel:
+        case Cmd::FavoriteChannel:
+        case Cmd::LiveTv:
+            scheduleInfoRefresh(kRefreshAfterChannelMs);
+            break;
+
+        case Cmd::ExternalInput:
+            scheduleInfoRefresh(kRefreshAfterInputMs);
+            break;
+
+        case Cmd::Power:
+            scheduleInfoRefresh(kRefreshAfterPowerMs);
+            break;
+
+        default:
+            if (cmd >= Cmd::Number0 && cmd <= Cmd::Number9)
+                scheduleInfoRefresh(kRefreshAfterDigitMs);
+            break;
+    }
 }
 
 void RemoteScreen::onCommandResult(bool ok) {

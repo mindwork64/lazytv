@@ -1,14 +1,56 @@
 #pragma once
 
+#include <QByteArray>
 #include <QObject>
 #include <QQueue>
+#include <QSet>
 #include <QString>
+#include <QVector>
 
 #include <functional>
 
 #include <lazytv/lazytv_export.h>
 
 namespace lazytv {
+
+/** Канал и текущая программа (cur_channel / channel_list). */
+struct LAZYTV_EXPORT ChannelInfo {
+    QString chtype;
+    QString major;
+    QString displayMajor;
+    QString minor;
+    QString displayMinor;
+    QString sourceIndex;
+    QString physicalNum;
+    QString chname;
+    QString progName;
+    QString audioCh;
+    QString inputSourceName;
+    QString inputSourceType;
+    QString labelName;
+    QString inputSourceIdx;
+
+    bool isValid() const {
+        return !major.isEmpty() || !chname.isEmpty()
+               || !inputSourceName.isEmpty() || !labelName.isEmpty();
+    }
+
+    /** Номер канала для UI: displayMajor (+ displayMinor), иначе major. */
+    QString number() const;
+
+    /** Название: chname, иначе имя входа. */
+    QString name() const;
+};
+
+/** Громкость из volume_info. */
+struct LAZYTV_EXPORT VolumeInfo {
+    int  level    = -1;
+    int  minLevel = 0;
+    int  maxLevel = 100;
+    bool muted    = false;
+
+    bool isValid() const { return level >= 0; }
+};
 
 /**
  * Клиент LG NetCast.
@@ -50,6 +92,15 @@ public:
     };
     Q_ENUM(Command)
 
+    /** Запросы данных через /roap/api/data (или /udap/api/data). */
+    enum class Query : int {
+        CurrentChannel = 1,
+        ChannelList,
+        VolumeInfo,
+        ScreenImage,
+    };
+    Q_ENUM(Query)
+
     /** Результат сопряжения. */
     struct PairingResult {
         QString session;
@@ -67,6 +118,15 @@ public:
     void confirmPairing(const QString& key);
     void sendCommand(Command cmd);
 
+    /** Переключить канал по записи из channel_list. */
+    void changeChannel(const ChannelInfo& channel);
+
+    /** Запросы состояния ТВ (без сессии). */
+    void requestCurrentChannel();
+    void requestChannelList();
+    void requestVolumeInfo();
+    void requestScreenImage();
+
     static Command digit(int d);
 
 signals:
@@ -74,6 +134,12 @@ signals:
     void pairingConfirmResult(const lazytv::Client::PairingResult& result);
     void commandResult(bool ok);
     void sessionExpired();
+
+    void currentChannelResult(const lazytv::ChannelInfo& channel);
+    void channelListResult(const QVector<lazytv::ChannelInfo>& channels);
+    void volumeInfoResult(const lazytv::VolumeInfo& volume);
+    void screenImageResult(const QByteArray& jpeg);
+    void queryFailed(lazytv::Client::Query query, int httpStatus);
 
 private:
     struct HttpResponse {
@@ -83,6 +149,12 @@ private:
 
     using HttpCallback = std::function<void(const HttpResponse&)>;
 
+    struct CommandRequest {
+        Command     cmd = Command::Power;
+        bool        channelChange = false;
+        ChannelInfo channel;
+    };
+
     void sendHttp(const QByteArray& method,
                   const QString& path,
                   const QByteArray& body,
@@ -90,10 +162,17 @@ private:
 
     void tryProcessNext();
 
+    void requestData(Query query, const QString& target);
+    void fetchData(Query query, const QString& target,
+                   const QString& base, bool allowFallback);
+    void handleData(Query query, const QByteArray& body);
+
     QString m_host;
     QString m_session;
+    QString m_dataBase;
 
-    QQueue<Command> m_queue;
+    QQueue<CommandRequest> m_queue;
+    QSet<int> m_pendingQueries;
     bool   m_inFlight = false;
     qint64 m_lastCommandAt = 0;
     bool   m_sessionExpired = false;
